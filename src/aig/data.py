@@ -17,6 +17,8 @@ class Corpus:
     links: pd.DataFrame
     device_of: dict               # anchor id -> network element
     truth: pd.DataFrame | None    # evaluation only; never a model input
+    nes: pd.DataFrame | None = None
+    cells: pd.DataFrame | None = None
 
     @property
     def days(self) -> list[pd.Timestamp]:
@@ -42,6 +44,8 @@ def load_corpus(root: str | Path, with_truth: bool = True) -> Corpus:
         links=pd.read_csv(inv / "links.csv"),
         device_of=device_of,
         truth=truth,
+        nes=nes,
+        cells=cells,
     )
 
 

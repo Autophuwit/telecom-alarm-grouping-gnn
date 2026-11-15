@@ -7,7 +7,10 @@ This project groups alarms into **incidents** so that related tickets can be mer
 ground-truth labels**: it learns from weak signals (clear times, tickets, resolution codes), each of which is wrong in
 its own way.
 
-![Precision against recall of merged ticket pairs](reports/figures/ticket_pair_tradeoff.png)
+![Replay of one incident: alarms arrive floor by floor over sites, devices, alarms and tickets](reports/figures/web_replay.gif)
+
+*Replay of one incident in the interactive view: alarms arrive in time order over the sites and the devices they are
+raised on; tickets and the crews' resolution codes sit on the floors above.* **[Open the live demo](https://autophuwit.github.io/telecom-alarm-grouping-gnn/)**
 
 > The code is a cleaned-up version of a model built on a live operator network. The data in this repository is
 > **synthetic**: [`synthetic/generate.py`](synthetic/generate.py) simulates a network and its failure modes, so that
@@ -59,6 +62,8 @@ flowchart LR
 
 ## Results (synthetic data, 4 held-out test days)
 
+![Precision against recall of merged ticket pairs](reports/figures/ticket_pair_tradeoff.png)
+
 | Method | Largest group | ARI | Ticket pairs merged / day | Precision | Recall |
 |---|---:|---:|---:|---:|---:|
 | Rule: linked sites, within 5 min | 41 | 0.15 | 179 | 97% | 9% |
@@ -76,6 +81,24 @@ truly share an incident, the share found. Numbers move by a few points between t
   ([notebook 02](notebooks/02_model_and_clustering.ipynb)).
 
 ![Single linkage against average linkage on the same alarms](reports/figures/case_single_vs_average.png)
+
+## Interactive view
+
+Numbers convince analysts; operations staff need to **see** an incident. [`aig.view`](src/aig/view.py) renders a day's
+incidents into one self-contained HTML page ([`web/template.html`](web/template.html), no build step, no server):
+
+* **3-D floors**, bottom to top: sites and their topology links, the device stack of each site (transport, RAN, cells),
+  the alarms with the model's pairs (green: cleared together, red: did not), tickets, and resolution codes.
+* **Replay**: start from an empty frame and step through the alarms as they arrived, with a running sequence panel.
+* **Cluster panel**: size, how many pairs co-cleared, whether the tickets share a root cause, blast radius, and how
+  many of its tickets' alarms ended up outside the incident.
+* **Map** of the incident's sites (Leaflet over public tiles).
+
+![The interactive view of one incident](reports/figures/web_view.png)
+
+```bash
+python -m aig.view --data data/synthetic --run runs/demo --out docs/index.html
+```
 
 ## Results on production data
 
@@ -98,9 +121,11 @@ Lessons from the production project, kept because they shaped the design:
 
 ```
 synthetic/generate.py           network simulator: topology, failures, tickets, ground truth
-src/aig/                        the pipeline (data, graph, labels, model, cluster, evaluate, run)
+src/aig/                        the pipeline (data, graph, labels, model, cluster, evaluate, run, view)
 notebooks/01_data_and_labels    what each weak label gets wrong
 notebooks/02_model_and_clustering   candidate graph, pair scores, clustering, error analysis
+web/template.html               the interactive view (plain HTML + JS, data injected as JSON)
+docs/index.html                 a rendered demo day, served by GitHub Pages
 reports/figures/                figures used in this README
 ```
 
@@ -110,6 +135,7 @@ reports/figures/                figures used in this README
 pip install -e .                                  # Python 3.10+, CPU is enough
 python synthetic/generate.py --days 14            # writes data/synthetic/
 python -m aig.run --data data/synthetic --out runs/demo --train-days 8 --val-days 2   # under a minute on CPU
+python -m aig.view --out docs/index.html          # the interactive page for the last test day
 ```
 
 The notebooks are stored with their outputs. Re-run them in Jupyter, or rebuild them with

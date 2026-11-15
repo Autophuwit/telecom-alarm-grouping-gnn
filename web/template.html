@@ -1,0 +1,4078 @@
+<meta charset="utf-8">
+<title>Alarm Incidents</title>
+
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --line:#21262d; --ink:#c9d1d9;
+    --dim:#7d8590; --accent:#58a6ff;
+    --ok:#3fb950; --bad:#f85149; --unk:#6e7681; --topo:#d29922;
+    --find:#bc8cff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg);color:var(--ink);
+    font:13px/1.55 ui-monospace,SFMono-Regular,"Cascadia Mono",Menlo,Consolas,monospace;
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  header{
+    padding:9px 14px;border-bottom:1px solid var(--line);background:var(--panel);
+    display:flex;align-items:center;gap:16px;flex-wrap:nowrap;flex:0 0 auto;
+  }
+  header h1{font-size:14px;margin:0;font-weight:600;letter-spacing:.02em;
+            white-space:nowrap}
+  #ccount{white-space:nowrap}
+  .cnt{color:var(--dim);font-size:12px}
+  .meta{color:var(--dim);font-size:10.5px}
+  header label{display:flex;align-items:center;gap:6px;font-size:12px;
+               cursor:pointer;user-select:none}
+  input[type=checkbox]{accent-color:var(--accent)}
+  input[type=range]{accent-color:var(--accent);width:170px}
+  select,input[type=text]{
+    background:var(--bg);border:1px solid var(--line);color:var(--ink);
+    padding:5px 8px;border-radius:5px;font:inherit;font-size:12px;
+  }
+  select:focus,input:focus{outline:none;border-color:var(--accent)}
+  button{
+    background:var(--bg);border:1px solid var(--line);color:var(--ink);
+    padding:5px 10px;border-radius:5px;font:inherit;font-size:12px;cursor:pointer;
+  }
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  main{flex:1;display:flex;min-height:0}
+
+  :root{--list-w:390px; --detail-w:352px}
+  #list{width:var(--list-w);flex:0 0 var(--list-w);background:var(--panel);
+        border-right:1px solid var(--line);overflow-y:auto}
+  body.lshut #list, body.dshut #detail{display:none}
+  .grip{position:relative;z-index:6;cursor:col-resize;user-select:none}
+
+  .grip::after{position:absolute;top:50%;left:50%;width:14px;height:46px;
+               margin:-23px 0 0 -7px;border-radius:7px;background:var(--panel);
+               border:1px solid var(--line);color:var(--dim);font-size:14px;
+               line-height:44px;text-align:center;cursor:pointer}
+  #listGrip::after{content:'\2039'}
+  body.lshut #listGrip::after{content:'\203A'}
+  #detailGrip::after{content:'\203A'}
+  body.dshut #detailGrip::after{content:'\2039'}
+  .grip:hover::after,.grip.on::after{color:var(--accent);
+                                     border-color:var(--accent)}
+  #listGrip{flex:0 0 7px;background:var(--panel);border-right:1px solid var(--line)}
+  #listGrip:hover,#listGrip.on{background:#1c2129}
+  #detailGrip{position:absolute;top:12px;bottom:12px;width:9px;
+              right:calc(12px + var(--detail-w))}
+  body.dshut #detailGrip{right:3px}
+  body.resizing, body.resizing *{cursor:col-resize !important}
+  #search{padding:9px;border-bottom:1px solid var(--line);position:sticky;
+          top:0;background:var(--panel);z-index:2}
+  #search input{width:100%}
+  .card{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+  .card:hover{background:#1c2129}
+  .card.sel{background:#132339;border-left:3px solid var(--accent);padding-left:11px}
+  .card .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .card .top b{font-size:13px;color:#fff;font-weight:600}
+  .sub{margin-top:4px;color:var(--dim);font-size:11px;display:flex;
+       flex-wrap:wrap;gap:4px 8px;align-items:center}
+  .chip{font-size:10px;padding:1px 6px;border-radius:8px;color:#0d1117;font-weight:600}
+  #stage{flex:1;position:relative;min-width:0}
+  canvas{display:block;width:100%;height:100%;cursor:grab;position:relative;z-index:1}
+
+  #leafClip{position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none}
+  #leaf{position:absolute;left:0;top:0;z-index:0;transform-origin:0 0;
+        pointer-events:none;background:transparent}
+  #leaf[hidden]{display:none}
+  #leaf .leaflet-container{background:transparent}
+  #leaf.inv .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg)}
+  canvas.drag{cursor:grabbing}
+  #legend{position:absolute;left:12px;bottom:12px;z-index:3;background:#0d1117d9;
+          border:1px solid var(--line);border-radius:7px;padding:10px 13px;
+          font-size:11px;color:var(--dim);max-width:274px;line-height:1.65}
+  .lg{display:flex;align-items:center;gap:7px;margin:1px 0}
+  .lgd{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  .lgs{width:9px;height:9px;flex:0 0 auto;transform:rotate(45deg);border:1.5px solid}
+  .lgl{width:16px;height:0;border-top-width:2px;border-top-style:solid;flex:0 0 auto}
+
+  .lg-h{display:flex;justify-content:space-between;align-items:center;gap:10px;
+        cursor:pointer;user-select:none;color:var(--ink);font-size:10px;
+        text-transform:uppercase;letter-spacing:.08em;margin:-2px 0 4px}
+  .lg-h:hover{color:var(--accent)}
+  #legend.min .lg-h{margin:-2px 0}
+  #legend.min .lg-b{display:none}
+  #detail{position:absolute;right:12px;top:12px;z-index:3;width:var(--detail-w);
+          max-height:calc(100% - 24px);overflow-y:auto;background:#0d1117f2;
+          border:1px solid var(--line);border-radius:7px;padding:12px 14px;font-size:12px}
+  #detail h2{font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;
+             color:var(--dim);margin:12px 0 5px;font-weight:600}
+  #detail h2:first-child{margin-top:0}
+  .row{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+  .row span:last-child{color:#fff;text-align:right;font-variant-numeric:tabular-nums}
+  .hint{color:var(--dim);font-size:11px;line-height:1.5}
+  .note{border-left:2px solid var(--find);padding:4px 0 4px 8px;margin:6px 0;
+        font-size:11px;line-height:1.5;color:var(--ink)}
+  .note.plain{border-left-color:var(--dim);color:var(--dim)}
+  #tip{position:absolute;pointer-events:none;background:#000e;color:#fff;
+       border:1px solid var(--line);border-radius:5px;padding:4px 8px;
+       font-size:11px;display:none;white-space:nowrap;z-index:5}
+  #empty{position:absolute;inset:0;z-index:2;pointer-events:none;display:flex;align-items:center;
+         justify-content:center;color:var(--dim);font-size:13px}
+  hr{border:0;border-top:1px solid var(--line);margin:10px 0}
+
+  .br{display:flex;align-items:baseline;gap:7px;margin:2px 0 1px}
+  .br-big{font-size:27px;line-height:1;color:#fff;font-weight:600;
+          font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .br-u{font-size:11.5px;color:var(--dim)}
+  .viz{display:block;width:100%;height:auto;margin:7px 0 2px}
+  .cap{color:var(--dim);font-size:10px;margin:0 0 4px}
+
+  .tl{margin:2px 0 0 4px;border-left:1px solid var(--line);padding-left:0}
+  .tl-b{position:relative;padding:4px 0 5px 13px}
+  .tl-b::before{content:'';position:absolute;left:-4.5px;top:9px;width:8px;
+                height:8px;border-radius:50%;background:var(--unk);
+                border:1px solid var(--bg)}
+  .tl-b.first::before{background:var(--accent);box-shadow:0 0 0 3px #58a6ff2e}
+  .tl-t{display:flex;flex-wrap:wrap;gap:2px 7px;align-items:baseline;
+        color:var(--dim);font-size:10px}
+  .tl-t b{color:var(--ink);font-size:11px;font-weight:600;
+          font-variant-numeric:tabular-nums}
+  .tl-tag{color:var(--accent);font-size:9.5px;text-transform:uppercase;
+          letter-spacing:.05em}
+  .tl-e{display:flex;gap:6px;align-items:baseline;padding:2px 5px 2px 3px;
+        margin:1px 0 0 -3px;border-radius:4px;cursor:pointer}
+  .tl-e:hover{background:#1c2129}
+  .tl-e.on{background:#132339;box-shadow:inset 2px 0 0 var(--accent)}
+  .tl-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;
+          transform:translateY(-1px)}
+  .tl-s{color:#fff;font-weight:600;flex:0 0 auto}
+  .tl-n{color:var(--dim);font-size:11px;flex:1 1 auto;min-width:0;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tl-tk{color:var(--find);font-size:10px;flex:0 0 auto;opacity:.85}
+  .tl-gap{color:var(--dim);font-size:9.5px;padding:1px 0 1px 13px;opacity:.65;
+          font-style:italic}
+  .tl-more{margin-top:6px;padding:5px 0;text-align:center;cursor:pointer;
+           border:1px dashed var(--line);border-radius:5px;color:var(--dim);
+           font-size:11px}
+  .tl-more:hover{border-color:var(--accent);color:var(--accent)}
+  .tl-e.future{opacity:.28}
+  .tl-b.now::before{background:#fff;box-shadow:0 0 0 3px #58a6ff55}
+  .tl-b.now .tl-t b{color:var(--accent)}
+
+  #detail.replaying .tl-b.past .tl-e{display:none}
+  #detail.replaying .tl-b.past{opacity:.5;padding-bottom:1px}
+  #detail.replaying .tl-b.fut,#detail.replaying .tl-gap.fut{display:none}
+  .tl-c{font-size:9px;line-height:13px;padding:0 4px;border-radius:6px;
+        color:#0d1117;font-weight:700;flex:0 0 auto;letter-spacing:.02em}
+
+  #nowCard{position:absolute;top:66px;left:12px;z-index:4;
+           max-width:min(470px,calc(100% - 24px));max-height:45%;overflow:auto;
+           background:var(--panel);border:1px solid var(--line);
+           border-radius:8px;padding:8px 11px 9px;font-size:12px;
+           box-shadow:0 4px 14px #0009}
+  #nowCard[hidden]{display:none}
+
+  #nowCard .nc-h:first-child{cursor:move;user-select:none}
+  #nowCard.fold{padding-bottom:8px}
+  #nowCard.fold .nc-g,#nowCard.fold .nc-more{display:none}
+  .nc-fold{margin-left:auto;color:var(--dim);font-size:11px;padding-left:8px}
+  .nc-h{display:flex;flex-wrap:wrap;gap:4px 9px;align-items:baseline;
+        color:var(--dim);font-size:11px}
+  .nc-h b{color:var(--accent);font-size:14px;font-variant-numeric:tabular-nums}
+  .nc-g{margin-top:7px}
+  .nc-r{display:flex;gap:9px;align-items:baseline;padding:3px 0 0 6px}
+  .nc-s{color:#fff;font-weight:600;flex:0 0 auto;min-width:62px}
+  .nc-n{color:var(--ink);flex:1 1 auto;min-width:0;overflow:hidden;
+        text-overflow:ellipsis;white-space:nowrap}
+  .nc-v{color:var(--dim);font-size:10px;flex:0 0 auto}
+  .nc-new{color:var(--find);font-size:9.5px;text-transform:uppercase;
+          letter-spacing:.05em;flex:0 0 auto}
+
+  #player{position:absolute;top:12px;left:12px;z-index:4;
+          right:calc(24px + var(--detail-w));
+          display:flex;align-items:center;gap:6px;padding:6px 10px;
+          background:#0d1117e6;border:1px solid var(--line);border-radius:7px;
+          font-size:11px}
+  #player[hidden]{display:none}
+  #player button{padding:5px 7px;line-height:0}
+  #player button svg{width:12px;height:12px;fill:currentColor}
+  #plPlay{color:var(--accent);border-color:#58a6ff66}
+  #plBar{flex:1 1 120px;min-width:80px;width:auto}
+  #plTime{color:var(--dim);white-space:nowrap;overflow:hidden;
+          text-overflow:ellipsis;min-width:0;font-variant-numeric:tabular-nums}
+  #plTime b{color:#fff;font-weight:600}
+  #player select{padding:3px 6px;font-size:11px}
+  #plAll,#mapBtn{white-space:nowrap}
+  #mapBtn.on{color:var(--accent);border-color:var(--accent)}
+
+  #mapNote{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:4;
+           background:#0d1117e6;border:1px solid var(--line);border-radius:7px;
+           padding:5px 11px;font-size:11px;color:var(--dim);max-width:60%}
+  #mapNote[hidden],#mapBase[hidden]{display:none}
+  #mapAttr{position:absolute;right:calc(18px + var(--detail-w));bottom:6px;z-index:3;
+           font-size:10px;color:#57606a;background:#ffffffb3;padding:0 5px;border-radius:3px}
+  body.dshut #mapAttr{right:10px}
+  #mapAttr[hidden]{display:none}
+  body.dshut #player{right:24px}
+
+  .tl-e.tke .tl-n{color:var(--find)}
+  #tkWinSel[hidden]{display:none}
+
+  #acc{display:inline-flex;align-items:baseline;gap:6px;padding:2px 9px;
+       border:1px solid var(--line);border-radius:11px;background:var(--bg);
+
+       min-width:0;flex:0 1 auto;white-space:nowrap;overflow:hidden;
+       text-overflow:ellipsis}
+  #acc:empty{display:none}
+  #acc b{font-variant-numeric:tabular-nums}
+  .dimtxt{color:var(--dim);opacity:.8}
+
+  #doc{margin-left:auto;color:var(--dim);font-size:11px;text-decoration:none;
+       border:1px solid var(--line);border-radius:11px;padding:2px 9px;
+       white-space:nowrap}
+  #doc:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+
+<header>
+  <h1>Alarm Incidents</h1>
+  <span class="cnt" id="ccount"></span>
+  <span class="cnt" id="acc"></span>
+
+  <span hidden>
+    <label id="dayWrap" hidden>day
+      <select id="day"></select>
+    </label>
+    <label>sort
+      <select id="sort">
+
+        <option value="tickets" selected>most tickets</option>
+        <option value="size">cluster size</option>
+        <option value="sites">site count</option>
+        <option value="score">best score</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="crossOnly"> cross-site links only</label>
+    <label><input type="checkbox" id="cc"> co-clear links only</label>
+    <label id="tkWrap" hidden><input type="checkbox" id="tk"> ticket colours</label>
+    <label><input type="checkbox" id="showSites" checked> site nodes</label>
+    <label><input type="checkbox" id="d3" checked> 3D layers</label>
+    <label><input type="checkbox" id="tidy" checked> rank topology</label>
+    <label id="neWrap" hidden title="the floors under the alarms: each site's devices -- transport, RAN (gNB / eNB), cells -- and what each alarm is raised on"><input type="checkbox" id="neStack" checked> device stack</label>
+    <button id="relayout">Re-layout</button>
+  </span>
+
+  <a id="doc" href="https://github.com/Autophuwit/telecom-alarm-grouping-gnn#readme" target="_blank" rel="noopener"
+     title="the project README: what this page is and how the grouping is made">how this works &#8594;</a>
+</header>
+
+<main>
+  <div id="list">
+    <div id="search"><input type="text" id="q" placeholder="find a site or ticket..." autocomplete="off"></div>
+    <div id="cards"></div>
+  </div>
+  <div id="listGrip" class="grip" title="click to hide or show the cluster list ( [ ) &#183; drag to resize it"></div>
+  <div id="stage">
+    <div id="leafClip"><div id="leaf" hidden></div></div>
+    <canvas id="cv"></canvas>
+    <div id="mapNote" hidden></div>
+    <div id="mapAttr" hidden>map &#169; Esri</div>
+    <div id="detailGrip" class="grip" title="click to hide or show the detail panel ( ] ) &#183; drag to resize it"></div>
+    <div id="player" hidden>
+      <button id="plReset" title="back to the first alarm (Home)"><svg viewBox="0 0 12 12"><path d="M1.5 2h1.6v8H1.5zM7 2v8L3.6 6zM11 2v8L7.6 6z"/></svg></button>
+      <button id="plPrev" title="previous moment (&#8592;)"><svg viewBox="0 0 12 12"><path d="M2 2h1.6v8H2zM10 2v8L4 6z"/></svg></button>
+      <button id="plPlay" title="play / pause (Space)"></button>
+      <button id="plNext" title="next moment (&#8594;)"><svg viewBox="0 0 12 12"><path d="M8.4 2H10v8H8.4zM2 2v8l6-4z"/></svg></button>
+      <input type="range" id="plBar" min="0" max="1" step="1" value="1" title="drag to any moment">
+      <span id="plTime"></span>
+      <select id="plSpeed" title="replay speed">
+        <option value="m">by moment</option>
+        <option value="5">&#215;5 real time</option>
+        <option value="15">&#215;15 real time</option>
+        <option value="60">&#215;60 real time</option>
+      </select>
+      <button id="plAll" title="show every alarm (End)" style="line-height:1.2">show all</button>
+      <select id="lines" title="which model pairs to draw. The cluster is the same either way -- this changes the picture, not the grouping">
+        <option value="site">site pairs</option>
+        <option value="bb">backbone</option>
+        <option value="all">all pairs</option>
+      </select>
+      <select id="tkWinSel" hidden title="tickets: how far a ticket's time may be from an alarm at its site and still join the cluster"></select>
+      <button id="mapBtn" title="put the sites at their real coordinates on a street map, under the same 3D layers (M). The map needs internet access." style="line-height:1.2">map</button>
+      <select id="mapBase" hidden title="the map under the sites">
+        <option value="osm">OpenStreetMap</option>
+        <option value="osmdark">OSM dark</option>
+        <option value="streets">streets</option>
+        <option value="satellite">satellite</option>
+        <option value="dark">dark</option>
+      </select>
+    </div>
+    <div id="nowCard" hidden></div>
+    <div id="legend"></div>
+    <div id="detail"></div>
+    <div id="tip"></div>
+    <div id="empty">Select a cluster on the left.</div>
+  </div>
+</main>
+
+<script>
+const G = __PAGE_DATA__;
+const DASH='—', ARR='↔', DEG='·';
+
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString('en-US');
+
+const iso = t => new Date(t*1000).toISOString().replace('T',' ').slice(0,19);
+const TZL = 'UTC';
+
+const FAM_COL = {'SITE DOWN': '#c9e265', 'CELL DOWN': '#4fc3f7', 'POWER': '#f0a04b',
+  'LINK DOWN': '#56d4c4', 'FTTX': '#ff8f6b', 'RAN X2': '#8c9eff',
+  'IP ROUTING': '#3ddc97', 'CLOCK': '#d7b8f3', 'RF HARDWARE': '#e8d5a0',
+  'ENVIRONMENT': '#c7a27c', 'MANAGEMENT': '#9aa7b4', 'OTHER': '#6e7681'};
+const FAM_COL_LIGHT = {'SITE DOWN': '#6b7d10', 'CELL DOWN': '#0b6fa4', 'POWER': '#b35c00',
+  'LINK DOWN': '#0f7f72', 'FTTX': '#c2410c', 'RAN X2': '#3949ab',
+  'IP ROUTING': '#15803d', 'CLOCK': '#7e57c2', 'RF HARDWARE': '#8d6e2f',
+  'ENVIRONMENT': '#7c4a1e', 'MANAGEMENT': '#4b5563', 'OTHER': '#57606a'};
+const catColor = id => FAM_COL[G.strings[id]] || 'hsl(' + ((id*67)%360) + ' 62% 58%)';
+const row = (a,b) => '<div class="row"><span>'+a+'</span><span>'+b+'</span></div>';
+
+const esc = s => String(s).replace(/[&<>"']/g,
+  ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+function roleTag(s, max){
+  if(!s.r || !s.r.length) return '';
+  const names = s.r.slice(0, max||2).map(x => G.strings[x[0]]);
+  const more = s.r.length - names.length;
+  return names.join('+') + (more>0 ? '+'+more : '');
+}
+
+const siteLabel = s => { const t = roleTag(s,2); return t ? t+' '+s.n : s.n; };
+
+const ECOL = '#6e7681';
+
+const SPOKE = '#4e8fb0';
+const HELD_C = '#8b949e';
+const ALC = '#79c0ff';
+let platesNow = null;
+const M = G.meta;
+
+const NES = G.nes || [], NELINKS = G.nelinks || [];
+const HAS_NE = NES.length > 0;
+const neFloor = k => k === 'CELL' ? 'C' : k === 'RAN' ? 'R' : 'T';
+const NE_COL = {T: '#39c5cf', R: '#ffa657', C: '#ffd8b5'};
+const NE_FLOOR_LAB = {T: 'TRANSPORT', R: 'RAN · gNB / eNB', C: 'CELLS'};
+const NE_WORDS = {AGG: 'aggregation router (AGG)', AC: 'access router (AC)', CPE: 'cell-site router (CPE)',
+  IPRAN: 'IP router', RAN: 'RAN node (gNB / eNB)', CELL: 'cell', BB: 'broadband NE', DWDM: 'DWDM NE',
+  OTHER: 'network element'};
+const TOWER_C = '#58a6ff', NE_POST_C = '#9fb3c8';
+const NE_EDGE = new Set(['nepost', 'necell', 'nelink', 'nex2', 'anc']);
+const SUB_STEP = 0.4;
+let LIFT = 0, SUBZ = {};
+const neR = n => n.fl === 'C' ? 3 : NES[n.ref].k === 'AGG' ? 6.5 : NES[n.ref].k === 'AC' ? 5.5 : n.fl === 'R' ? 5 : 4.5;
+const neName = i => G.strings[NES[N[i].ref].n];
+
+const neAlarms = k => clusters[curIdx].al.filter(i => G.alarms[i].ne === k);
+function neTip(n){
+  const r = NES[n.ref], here = neAlarms(n.ref).length;
+  return (NE_WORDS[r.k] || r.k)+' '+G.strings[r.n]+' @ '+G.sites[r.s].n+' '+DEG+' '+
+    (here ? here+' alarm'+(here === 1 ? '' : 's')+' on it' : 'no alarm on it in this cluster');
+}
+const deviceLine = a => a.ne == null ? '' : '<br><span style="color:'+NE_COL[neFloor(NES[a.ne].k)]+'">on '+
+  esc(NE_WORDS[NES[a.ne].k] || NES[a.ne].k)+' '+esc(G.strings[NES[a.ne].n])+'</span>';
+const ROOT_C = '#f5c518';
+const pctS = v => (100*v).toFixed(0)+'%';
+
+const TK = Array.isArray(G.tickets) ? G.tickets : [];
+const HAS_TK = TK.length > 0;
+const TKM = M.ticket_match || {};
+const HAS_RC = TK.some(k => k.rc);
+const RC_BY = (M.resolution && M.resolution.by || 'res_tier2').replace(/_/g, ' ');
+
+const RP = M.prediction || null;
+const HAS_RP = !!RP && TK.some(k => k.rp);
+const RP_MODELS = HAS_RP ? RP.models.filter(s => s.n) : [];
+const RP_OK = '#4ade80', RP_BAD = '#f87171', RP_SEP = ' <span style="opacity:.5">&#8250;</span> ';
+
+const HAS_WO = TK.some(k => Array.isArray(k.wo));
+const woCanceled = w => /cancel/i.test(w.st || '');
+
+const TK_BY_ID = TK.some(k => Array.isArray(k.al));
+const tkOfAlarm = new Map();
+if(TK_BY_ID) TK.forEach((k, i) => { for(const a of (k.al || [])){
+  if(!tkOfAlarm.has(a)) tkOfAlarm.set(a, []);
+  tkOfAlarm.get(a).push(i); } });
+const tkBySite = new Map();
+TK.forEach((k, i) => { if(!tkBySite.has(k.s)) tkBySite.set(k.s, []);
+                       tkBySite.get(k.s).push(i); });
+
+const EDGE_OK = '#3fb950', EDGE_BAD = '#f85149', EDGE_MID = '#d29922';
+
+const INK_LIGHT = {'#3fb950': '#1a7f37', '#f85149': '#cf222e', '#d29922': '#9a6700',
+                   '#6e7681': '#57606a', '#4e8fb0': '#0969da', '#8b949e': '#57606a'};
+const onLight = () => mapOn && geo && !!(MAP_BASES[mapBase] || {}).light;
+const ink = c => onLight() ? (INK_LIGHT[c] || c) : c;
+const alarmInk = id => onLight() ? (FAM_COL_LIGHT[G.strings[id]] || 'hsl(' + ((id*67)%360) + ' 80% 40%)')
+                                 : catColor(id);
+const VERIFIED = G.edges.some(e => e.dc != null) && M.coclear_tol_sec != null;
+
+const tolOf = e => e.tol != null ? e.tol : M.coclear_tol_sec;
+const negOf = e => e.tol != null ? e.tol : M.coclear_neg_sec;
+const judgedE = e => e.dc != null && !e.nj;
+const BY_KIND = G.edges.some(e => e.tol != null);
+const NJ_WHY = {1: 'an alarm kind with no tolerance', 2: 'a synthetic alarm'};
+
+const durT = s => s % 3600 === 0 ? (s/3600)+'h' : s % 60 === 0 ? (s/60)+'m' : dur(s);
+
+const TICKETED = G.edges.some(e => e.v !== 0);
+let ticketMode = TICKETED && !VERIFIED;
+if(TICKETED){ $('tkWrap').hidden = false; $('tk').checked = ticketMode; }
+
+const synPairOk = m => m.nj === 2 && m.st != null && m.dc != null ? m.dc <= m.st : null;
+function edgeColor(m){
+  const sv = ticketMode ? null : synPairOk(m);
+  if(sv != null) return sv ? EDGE_OK : EDGE_BAD;
+  if(ticketMode){
+
+    if(m.v === 1) return EDGE_OK;
+    if(m.v === -1) return EDGE_BAD;
+    return ECOL;
+  }
+  if(!VERIFIED || !judgedE(m)) return ECOL;
+  if(m.dc <= tolOf(m)) return EDGE_OK;
+  const neg = negOf(m);
+  return (neg != null && m.dc > neg) || neg == null ? EDGE_BAD : EDGE_MID;
+}
+
+function drawLegend(){
+$('legend').innerHTML =
+  '<div class="lg-h" title="click to fold or unfold"><span>legend</span>'+
+    '<span class="lg-arrow">'+($('legend').classList.contains('min')
+      ? '&#9656;' : '&#9662;')+'</span></div><div class="lg-b">'+
+  '<div class="lg"><span class="lgd" style="background:#79c0ff"></span>'+
+    'alarm <span style="color:var(--dim)">(size = repeats)</span></div>'+
+  (M.hawkes
+    ? '<div class="lg"><span class="lgd" style="background:transparent;border:2.5px solid '+ROOT_C+'"></span>'+
+        'root cause (Hawkes)</div>'+
+      '<div class="lg"><span class="lgd" style="background:transparent;border:2px dashed '+ROOT_C+'"></span>'+
+        'root, other-family links only (h x-fam)</div>' : '')+
+  '<div class="lg"><span class="lgs" style="border-color:#8b949e"></span>'+
+    'site</div>'+
+  (HAS_TK
+    ? '<div class="lg"><span style="width:9px;height:9px;flex:0 0 auto;background:'+
+        '#bc8cff"></span>ticket, on its own layer</div>'+
+      '<div class="lg"><span class="lgd" style="background:#f778ba"></span>'+
+        (TKM.synthetic_below ? 'a ticket\'s synthetic alarm, under the ticket (click: where the alarm is)'
+                 : 'synthetic alarm (click for its name)')+'</div>' : '')+
+  '<hr style="margin:6px 0">'+
+  (ticketMode
+    ? '<div class="lg"><span class="lgl" style="border-color:'+EDGE_OK+
+        '"></span>same ticket at both ends</div>'+
+      '<div class="lg"><span class="lgl" style="border-color:'+EDGE_BAD+
+        '"></span>different tickets</div>'+
+      '<div class="lg"><span class="lgl" style="border-color:'+ECOL+
+        '"></span>one end or both carry no ticket</div>'+
+      '<div class="lg" style="padding-left:23px;margin-top:-2px">'+
+        '<span style="color:var(--dim)">a ticket is a work item, not an '+
+        'incident</span></div>'
+    : VERIFIED
+    ? '<div class="lg"><span class="lgl" style="border-color:'+EDGE_OK+
+        '"></span>pair that DID co-clear ('+(BY_KIND
+          ? 'within its alarm kinds\' tolerance'
+          : '&#8804;'+dur(M.coclear_tol_sec))+')</div>'+
+      '<div class="lg"><span class="lgl" style="border-color:'+EDGE_BAD+
+        '"></span>pair that did NOT</div>'+
+      '<div class="lg"><span class="lgl" style="border-color:'+ECOL+
+        '"></span>never cleared, or not '+(BY_KIND ? 'judged' : 'returned')+'</div>'+
+      (BY_KIND ? '<div class="lg" style="padding-left:23px;margin-top:-2px">'+
+        '<span style="color:var(--dim)">click a cluster for the tolerances it '+
+        'was judged by</span></div>' : '')
+    : '<div class="lg"><span class="lgl" style="border-color:'+ECOL+
+        '"></span>model pair</div>')+
+  '<div class="lg"><span class="lgl" style="border-color:var(--topo)">'+
+    '</span>site'+ARR+'site, real topology</div>'+
+  (G.alarms.some(a => a.tg)
+    ? '<div class="lg"><span class="lgl" style="border-color:'+HELD_C+';border-top-style:dashed"></span>'+
+        'held by its ticket: the model linked it to nothing (not a pair)</div>' : '')+
+  (HAS_TK
+    ? (TKM.synthetic_below
+
+      ? '<div class="lg"><span class="lgl" style="border-color:#f778ba"></span><span>'+
+          'alarm'+ARR+'its ticket\'s synthetic alarm (up to its floor)</span></div>'+
+        (TK.some(k => k.sc != null)
+          ? '<div class="lg"><span class="lgl" style="border-color:'+EDGE_OK+'"></span><span>'+
+              'alarm floor: alarm'+ARR+'its ticket\'s synthetic alarm, <span style="color:'+EDGE_OK+'">together</span> / '+
+              '<span style="color:'+EDGE_BAD+'">apart</span> by their clears, grey not judged</span></div>'+
+            '<div class="lg"><span class="lgl" style="border-color:'+EDGE_OK+'"></span><span>'+
+              'synthetic floor: synthetic'+ARR+'synthetic alarm, the same; '+
+              (M.coclear_tol_sec ? durT(M.coclear_tol_sec)+' where neither kind has a tolerance' : '')+'</span></div>'
+          : '')+
+        (G.edges.some(e => e.st != null) || TK.some(k => k.sc != null)
+          ? '<div class="lg" style="padding-left:23px;margin-top:-2px"><span style="color:var(--dim)">'+
+            'a line or pair with a synthetic alarm is coloured, never counted in a score</span></div>' : '')+
+        (HAS_WO
+          ? '<div class="lg"><span style="width:9px;height:9px;flex:0 0 auto;margin:0 4px;background:#2dd4bf;'+
+              'transform:rotate(45deg)"></span><span>work order over the ticket that opened it, on the top floor; '+
+              '<span style="color:#6e7681">hollow grey</span> cancelled</span></div>' : '')+
+        (HAS_RC
+          ? '<div class="lg"><span class="lgl" style="border-color:#e3b341"></span><span>'+
+              'ticket'+ARR+'its resolution ('+esc(RC_BY.replace('Resolution Category ', ''))+
+              '), a hexagon per category on its own floor between the tickets and the work orders; tickets naming '+
+              'one cause meet at one hexagon; <span style="color:#6e7681">grey</span> names no cause</span></div>' : '')+
+        '<div class="lg"><span class="lgl" style="border-color:#bc8cff;'+
+          'border-top-style:dashed"></span>synthetic alarm'+ARR+'its ticket; '+
+          'alarm'+ARR+'ticket when the ticket names none</div>'
+      : '<div class="lg"><span class="lgl" style="border-color:#bc8cff;'+
+        'border-top-style:dashed"></span>'+(TK_BY_ID ? 'alarm'+ARR+'the ticket it is on'
+          : 'site'+ARR+'ticket (same site, near in time)')+'</div>'+
+      '<div class="lg"><span class="lgl" style="border-color:#f778ba"></span>'+
+        'ticket'+ARR+'the synthetic alarm it names</div>')+
+      (TK.some(k => k.na != null)
+        ? '<div class="lg"><span style="display:inline-block;width:9px;height:9px;'+
+          'margin:0 9px 0 5px;border:2px solid #bc8cff"></span>hollow ticket: some of its '+
+          'alarms are outside this cluster</div>' : '') : '')+
+  (G.alarms.some(a => a.l && a.l.SYNTHETIC != null)
+    ? '<div class="lg"><span style="display:inline-block;width:7px;height:7px;margin:0 9px 0 6px;'+
+        'border-radius:50%;background:#f778ba;box-shadow:0 0 0 2px var(--bg,#0d1117),0 0 0 4px #f778ba"></span>'+
+        'a ticket\'s own synthetic alarm (on the alarm layer; never judged)</div>' : '')+
+  (HAS_NE
+    ? '<div class="lg"><span style="width:9px;height:9px;flex:0 0 auto;margin:0 4px;background:'+NE_COL.T+'"></span>'+
+        '<span>transport NE (CPE, AC, AGG), the first floor over the sites</span></div>'+
+      '<div class="lg"><span style="width:0;height:0;flex:0 0 auto;margin:0 3px;border-left:5px solid transparent;'+
+        'border-right:5px solid transparent;border-bottom:9px solid '+NE_COL.R+'"></span>'+
+        '<span>RAN node (gNB / eNB), the floor above</span></div>'+
+      '<div class="lg"><span class="lgd" style="background:'+NE_COL.C+'"></span><span>cell, over the NE that serves it</span></div>'+
+      '<div class="lg" style="padding-left:23px;margin-top:-2px"><span style="color:var(--dim)">filled: an alarm of '+
+        'this cluster is raised on it; hollow: one of the site\'s own devices, quiet here</span></div>'+
+      '<div class="lg"><span class="lgl" style="border-color:var(--topo)"></span><span>device'+ARR+'device, a link on the NE graph</span></div>'+
+      '<div class="lg"><span class="lgl" style="border-color:'+NE_COL.R+';border-top-style:dashed"></span>'+
+        '<span>X2 / Xn neighbours</span></div>' : '')+
+  '<div class="lg"><span class="lgl" style="border-color:'+SPOKE+';'+
+    'border-top-style:dotted"></span>alarm'+ARR+(HAS_NE ? 'the device it is raised on (or its site)' : 'the site that raised it')+'</div>'+
+  (HAS_NE ? '<div class="lg" style="padding-left:23px;margin-top:-2px"><span style="color:var(--dim)">fainter dots: '+
+    'down to its own site, when that device stands at another (hub) site</span></div>' : '')+
+  '<div class="lg" style="padding-left:23px;margin-top:-2px">'+
+    '<span style="color:var(--dim)">a site\'s first alarm stands straight '+
+    'above it; its later ones branch from that one</span></div>'+
+
+  '<div class="lg"><span style="width:16px;flex:0 0 auto;text-align:center;'+
+    'color:'+ECOL+';font-size:11px">&#9654;</span>'+
+    'arrow on a pair: which alarm fired FIRST</div>'+
+  '<div class="lg" style="padding-left:23px;margin-top:-2px">'+
+    '<span style="color:var(--dim)">no arrow means the same second</span></div>'+
+  (lineMode === 'site'
+    ? '<div class="lg" style="margin-top:6px">site pairs: one line per two '+
+        'sites, thicker = more alarm pairs</div>'+
+      (VERIFIED || ticketMode
+        ? '<div class="lg" style="padding-left:23px;margin-top:-2px">'+
+            '<span style="color:var(--dim)">amber: some of its pairs agree, '+
+            'some do not</span></div>' : '')+
+      '<div class="lg" style="padding-left:23px;margin-top:-2px">'+
+        '<span style="color:var(--dim)">hover a line or an alarm for its '+
+        'alarm pairs</span></div>'
+    : '')+
+  (lineMode === 'bb'
+    ? '<div class="lg" style="margin-top:6px">backbone: one line ties each '+
+        'alarm into the cluster</div>'+
+      '<div class="lg" style="padding-left:23px;margin-top:-2px">'+
+        '<span style="color:var(--dim)">hover an alarm for all its pairs</span></div>'
+    : '')+
+  '<div class="lg" style="margin-top:6px">drag any node to pin it</div>'+
+  '<div class="lg">right-drag to turn the scene</div></div>';
+}
+
+const prefGet = k => { try{ return localStorage.getItem('disc.'+k); }catch(e){ return null; } };
+const prefSet = (k, v) => { try{ localStorage.setItem('disc.'+k, v); }catch(e){} };
+
+const TK_WINS = [15, 30, 60, 120, 360, 1440];
+let tkWin = TK_WINS.includes(+prefGet('tkWin')) ? +prefGet('tkWin')*60
+                                                  : (TKM.window_sec || 3600);
+
+let lineMode = ['all', 'bb', 'site'].includes(prefGet('lines')) ? prefGet('lines')
+             : ['all', 'bb', 'site'].includes(M.lines) ? M.lines : 'site';
+
+if(prefGet('legendMin') === '1') $('legend').classList.add('min');
+drawLegend();
+$('legend').addEventListener('click', e => {
+  if(!e.target.closest('.lg-h')) return;
+  const min = $('legend').classList.toggle('min');
+  prefSet('legendMin', min ? '1' : '0');
+  drawLegend();
+});
+
+const DAYS = [...new Set(G.alarms.map(a => a.d).filter(d => d != null))].sort();
+if(DAYS.length > 1){
+  $('dayWrap').hidden = false;
+  $('day').innerHTML = '<option value="">all '+DAYS.length+' days</option>'+
+    DAYS.map(d => '<option value="'+d+'">'+
+      d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8)+'</option>').join('');
+}
+const dayOf = i => G.alarms[i].d;
+
+const transitSet = new Set(G.transit || []);
+
+const topoOf = new Map();
+for(const t of G.topo){
+  for(const [x,y] of [[t[0],t[1]],[t[1],t[0]]]){
+    let l = topoOf.get(x); if(!l) topoOf.set(x, l=[]);
+    l.push(y);
+  }
+}
+
+const VIA_HOPS = M.via_hops || 5, VIA_MAX_SITES = 400;
+function viaPath(siteSet){
+  const via = new Set();
+  if(siteSet.size < 2 || siteSet.size > VIA_MAX_SITES || !topoOf.size) return via;
+  const comp = new Map(); let nc = 0;
+  for(const s0 of siteSet){
+    if(comp.has(s0)) continue;
+    comp.set(s0, nc);
+    const q = [s0];
+    while(q.length){
+      const v = q.pop();
+      for(const o of (topoOf.get(v) || []))
+        if(siteSet.has(o) && !comp.has(o)){ comp.set(o, nc); q.push(o); }
+    }
+    nc++;
+  }
+  if(nc < 2) return via;
+  const par = Array.from({length: nc}, (_, i) => i);
+  const fd = x => { while(par[x] !== x){ par[x] = par[par[x]]; x = par[x]; } return x; };
+
+  const live = c0 => [...comp].some(([s, c]) => fd(c) === c0 && (topoOf.get(s) || []).length);
+  for(let grew = true; grew;){
+    grew = false;
+    for(let c0 = 0; c0 < nc; c0++){
+      if(fd(c0) !== c0 || !live(c0)) continue;
+      const depth = new Map(), prev = new Map(), q = [];
+      for(const [s, c] of comp) if(fd(c) === c0){ depth.set(s, 0); q.push(s); }
+      let hit = -1;
+      for(let qi = 0; qi < q.length && hit < 0; qi++){
+        const v = q[qi], dv = depth.get(v);
+        if(dv >= VIA_HOPS) continue;
+        for(const o of (topoOf.get(v) || [])){
+          if(depth.has(o)) continue;
+          depth.set(o, dv + 1); prev.set(o, v);
+          if(comp.has(o)){ hit = o; break; }
+          q.push(o);
+        }
+      }
+      if(hit < 0) continue;
+      for(let v = prev.get(hit); depth.get(v) > 0; v = prev.get(v)){
+        siteSet.add(v); via.add(v); comp.set(v, c0);
+      }
+      par[fd(comp.get(hit))] = c0;
+      grew = true;
+    }
+  }
+  return via;
+}
+
+let curVia = new Set();
+
+function ensureTopoRoots(){
+  if(G._troot) return;
+  const tp = new Int32Array(G.sites.length);
+  for(let i=0;i<tp.length;i++) tp[i] = i;
+  const tf = x => { while(tp[x] !== x){ tp[x] = tp[tp[x]]; x = tp[x]; } return x; };
+  const tu = (x, y) => { const rx = tf(x), ry = tf(y); if(rx !== ry) tp[rx] = ry; };
+  for(const [sa, sb] of (G.topo || [])) tu(sa, sb);
+  for(const e of G.edges) if(e.h != null && e.h >= 0) tu(G.alarms[e.i].s, G.alarms[e.j].s);
+  G._troot = Int32Array.from(G.alarms, a => tf(a.s));
+  G._alat = Float64Array.from(G.alarms, a => {
+    const v = G.sites[a.s].lat; return v == null ? NaN : v; });
+  G._alon = Float64Array.from(G.alarms, a => {
+    const v = G.sites[a.s].lon; return v == null ? NaN : v; });
+}
+
+const HOP_LABELS = Array.isArray(M.hop_labels) ? M.hop_labels : [];
+function hopLabel(h){
+  if(h == null) return DASH;
+  if(HOP_LABELS.length)
+    return HOP_LABELS[h < 0 ? HOP_LABELS.length - 1
+                            : Math.min(h, HOP_LABELS.length - 2)];
+  if(h < 0) return 'unreachable';
+  return h === 0 ? 'same site' : h + (h === 1 ? ' hop' : ' hops');
+}
+
+const R_KM = 6371.0;
+function kmA(i, j){
+  const la = G._alat, lo = G._alon;
+  const p1 = la[i]*Math.PI/180, p2 = la[j]*Math.PI/180;
+  const dp = p2 - p1, dl = (lo[j] - lo[i])*Math.PI/180;
+  const s = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return 2*R_KM*Math.asin(Math.sqrt(Math.min(1, Math.max(0, s))));
+}
+
+const ALL_KM_DEFAULT = 40;
+let clusters = [], filtered = [], curIdx = -1;
+
+let usedEdges = [];
+
+function buildClusters(){
+
+  let use = G.edges.slice();
+
+  const day = DAYS.length > 1 ? $('day').value : '';
+  if(day) use = use.filter(e => dayOf(e.i) === day);
+
+  if($('crossOnly').checked)
+    use = use.filter(e => G.alarms[e.i].s !== G.alarms[e.j].s);
+
+  const ccTol = M.coclear_tol_sec;
+  if($('cc') && $('cc').checked && ccTol != null)
+    use = use.filter(e => !judgedE(e) || e.dc <= tolOf(e));
+  const p = new Int32Array(G.alarms.length);
+  for(let i=0;i<p.length;i++) p[i] = i;
+  const find = x => { while(p[x] !== x){ p[x] = p[p[x]]; x = p[x]; } return x; };
+
+  const cap = M.max_cluster_spread_sec;
+  const capOnset = M.max_cluster_onset_sec;
+  const capKm = M.max_cluster_no_topo_km;
+  const capAll = ('max_cluster_all_km' in M) ? M.max_cluster_all_km
+                                             : ALL_KM_DEFAULT;
+  const N = G.alarms.length;
+  const lo = new Float64Array(N).fill(Infinity);
+  const hi = new Float64Array(N).fill(-Infinity);
+  const loT = new Float64Array(N).fill(Infinity);
+  const hiT = new Float64Array(N).fill(-Infinity);
+  for(let i=0;i<N;i++){
+    const ct = G.alarms[i].ct;
+    if(ct != null){ lo[i] = ct; hi[i] = ct; }
+    const t = G.alarms[i].t;
+    if(t != null){ loT[i] = t; hiT[i] = t; }
+  }
+  const spanOK = (a, b, l, h, c) => {
+    const mn = Math.min(l[a], l[b]), mx = Math.max(h[a], h[b]);
+    return !(mx > mn) || (mx - mn) <= c;
+  };
+
+  let troot = null, memOf = null, alat = null;
+  if(capKm != null || capAll != null){
+    ensureTopoRoots();
+    troot = G._troot; alat = G._alat;
+    memOf = new Map();
+    for(let i=0;i<N;i++) memOf.set(i, [i]);
+  }
+  const km = kmA;
+
+  const kmOK = (ra, rb) => {
+    let A = memOf.get(ra), B = memOf.get(rb);
+    if(A.length > B.length){ const t = A; A = B; B = t; }
+    for(const a of A){
+      if(!isFinite(alat[a])) continue;
+      for(const b of B){
+        if(!isFinite(alat[b])) continue;
+        const related = troot[a] === troot[b];
+        if(related && capAll == null) continue;
+        const d = km(a, b);
+        if(capKm != null && !related && d > capKm) return false;
+        if(capAll != null && d > capAll) return false;
+      }
+    }
+    return true;
+  };
+
+  if(M.by_incident){
+    const first = new Map();
+    for(let i=0;i<N;i++){
+      const g = G.alarms[i].g;
+      if(g == null) continue;
+      if(first.has(g)){ const a = find(i), b = find(first.get(g)); if(a !== b) p[a] = b; }
+      else first.set(g, i);
+    }
+  }
+  const held = new Set();
+  for(const e of use){
+    const a = find(e.i), b = find(e.j);
+    if(a === b) continue;
+    if(cap != null && !spanOK(a, b, lo, hi, cap)){ held.add(e); continue; }
+    if(capOnset != null && !spanOK(a, b, loT, hiT, capOnset)){ held.add(e); continue; }
+    if(memOf && !kmOK(a, b)){ held.add(e); continue; }
+    p[a] = b;
+    lo[b] = Math.min(lo[a], lo[b]);
+    hi[b] = Math.max(hi[a], hi[b]);
+    loT[b] = Math.min(loT[a], loT[b]);
+    hiT[b] = Math.max(hiT[a], hiT[b]);
+    if(memOf){
+      const ma = memOf.get(a), mb = memOf.get(b);
+      memOf.set(b, ma.length > mb.length ? ma.concat(mb) : mb.concat(ma));
+      memOf.delete(a);
+    }
+  }
+
+  if(held.size){
+    for(const e of [...held]) if(find(e.i) === find(e.j)) held.delete(e);
+    use = use.filter(e => !held.has(e));
+  }
+  usedEdges = use;
+  const members = new Map(), byRoot = new Map();
+  for(const e of use){
+    const r = find(e.i);
+    let l = byRoot.get(r); if(!l) byRoot.set(r, l=[]);
+    l.push(e);
+    for(const x of [e.i, e.j]){
+      let m = members.get(find(x)); if(!m) members.set(find(x), m=new Set());
+      m.add(x);
+    }
+  }
+
+  if(M.by_incident){
+    for(let i=0;i<N;i++){
+      if(!G.alarms[i].tg || G.alarms[i].g == null || (day && dayOf(i) !== day)) continue;
+      const r = find(i);
+      let m = members.get(r); if(!m) members.set(r, m=new Set());
+      m.add(i);
+      if(!byRoot.has(r)) byRoot.set(r, []);
+    }
+  }
+  clusters = [];
+  for(const [root, es] of byRoot){
+    const al = [...(members.get(root) || [])];
+    if(al.length < M.min_cluster) continue;
+    const siteSet = new Set(al.map(i => G.alarms[i].s));
+    let conf=0, contra=0, disc=0, dconf=0, dcontra=0, best=-1e9;
+    const cats = new Map();
+    for(const e of es){
+      if(e.v === 1) conf++; else if(e.v === -1) contra++;
+      if(e.r === 0){
+        disc++;
+        if(e.v === 1) dconf++; else if(e.v === -1) dcontra++;
+      }
+
+      if(e.s != null && e.s > best) best = e.s;
+    }
+    for(const i of al) cats.set(G.alarms[i].c, (cats.get(G.alarms[i].c)||0)+1);
+    const badges = [...cats].sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>x[0]);
+
+    const alarming = siteSet.size;
+
+    const via = viaPath(siteSet);
+    clusters.push({al, es, sites:[...siteSet], nSites: alarming, via,
+                   conf, contra, disc, dconf,
+                   dcontra, best, badges,
+                   labelled: al.some(i => G.alarms[i].l)});
+  }
+  curIdx = -1;
+  $('empty').style.display = '';
+  $('detail').innerHTML = '';
+}
+
+function verifiedLine(){
+
+  if(ticketMode){
+    let k = 0, same = 0;
+    for(const e of usedEdges){ if(e.v !== 0){ k++; if(e.v === 1) same++; } }
+    if(!k) return '<span class="dimtxt">no pair on this page has a ticket '+
+      'at both ends</span>';
+    const f = same/k;
+    const col = f >= .8 ? 'var(--ok)' : (f >= .5 ? 'var(--topo)' : 'var(--bad)');
+    return 'same ticket <b style="color:'+col+'">'+(f*100).toFixed(0)+'</b>'+
+      ' of '+k+' judged <span class="dimtxt">('+
+      (usedEdges.length-k)+' pairs unticketed &#183; a ticket is a work '+
+      'item, not an incident)</span>';
+  }
+  if(!VERIFIED) return '';
+  const tol = M.coclear_tol_sec;
+
+  let known = 0, ok = 0;
+  for(const e of usedEdges) if(judgedE(e)){
+    known++; if(e.dc <= tolOf(e)) ok++;
+  }
+  let clean = 0, decided = 0;
+  for(const c of clusters){
+    let k = 0, a = 0;
+    for(const e of c.es) if(judgedE(e)){ k++; if(e.dc <= tolOf(e)) a++; }
+    if(k){ decided++; if(a === k) clean++; }
+  }
+  if(!known)
+    return '<span class="dimtxt">no pair on this page has a clear time at '+
+      'both ends</span>';
+  const f = ok/known;
+  const col = f >= .8 ? 'var(--ok)' : (f >= .5 ? 'var(--topo)' : 'var(--bad)');
+
+  const total = usedEdges.length;
+
+  const win = BY_KIND ? 'by kind'
+    : tol % 60 === 0 && tol < 3600 ? (tol/60)+'m' : dur(tol);
+  const pct = total ? (known/total*100).toFixed(0) : 0;
+  $('acc').title = fmt(ok)+' of '+fmt(known)+' judged pairs co-cleared '+
+    (BY_KIND ? 'within the tolerance of their alarm kinds (the larger of the '+
+               'pair\'s two; click a cluster to see which)'
+             : 'within '+dur(tol))+'. '+fmt(known)+' of '+fmt(total)+' pairs ('+pct+
+    '%) '+(BY_KIND ? 'have a clear time at both ends and a tolerance for both '+
+                     'kinds,' : 'have a clear time at both ends')+
+    ' and could be judged. '+clean+' of '+
+    decided+' clusters have every judged pair right.';
+  return 'accuracy <b style="color:'+col+'">'+(f*100).toFixed(0)+'%</b>'+
+    '<span class="dimtxt">'+(BY_KIND ? '' : '&#8804;')+win+'</span>'+
+    '<span class="dimtxt">'+DEG+'</span>'+
+    '<b>'+fmt(ok)+'/'+fmt(known)+'</b><span class="dimtxt">right</span>'+
+    '<span class="dimtxt">'+DEG+'</span>'+
+    '<span class="dimtxt">judged</span><b>'+pct+'%</b>'+
+    '<span class="dimtxt">of '+fmt(total)+'</span>'+
+    '<span class="dimtxt">'+DEG+'</span>'+
+    '<b>'+clean+'/'+decided+'</b>'+
+    '<span class="dimtxt">clusters clean</span>';
+}
+
+function ticketsOf(c){
+  if(!HAS_TK) return [];
+  if(c._tk && c._tkW === tkWin) return c._tk;
+  if(TK_BY_ID){
+
+    const got = new Map();
+    for(const i of c.al) for(const k of (tkOfAlarm.get(i) || [])){
+      if(!got.has(k)) got.set(k, []);
+      got.get(k).push(i);
+    }
+    const res = [];
+    for(const [k, als] of got){
+
+      const own = als.filter(i => G.alarms[i].s === TK[k].s);
+      let d = null, a = -1;
+      for(const i of (own.length ? own : als)){
+        const x = TK[k].t - G.alarms[i].t;
+        if(d === null || Math.abs(x) < Math.abs(d)){ d = x; a = i; }
+      }
+      res.push({k, d, a, als, ownHere: own.length > 0});
+    }
+    res.sort((x, y) => TK[x.k].t - TK[y.k].t || (TK[x.k].id < TK[y.k].id ? -1 : 1));
+    c._tk = res; c._tkW = tkWin;
+    return res;
+  }
+  const at = new Map();
+  for(const i of c.al){
+    const s = G.alarms[i].s;
+    if(!tkBySite.has(s)) continue;
+    if(!at.has(s)) at.set(s, []);
+    at.get(s).push(i);
+  }
+  const out = [];
+  for(const [s, als] of at) for(const k of tkBySite.get(s)){
+    let d = null, a = -1;
+    for(const i of als){
+      const x = TK[k].t - G.alarms[i].t;
+      if(d === null || Math.abs(x) < Math.abs(d)){ d = x; a = i; }
+    }
+
+    if(Math.abs(d) <= tkWin) out.push({k, d, a});
+  }
+  out.sort((x, y) => TK[x.k].t - TK[y.k].t || (TK[x.k].id < TK[y.k].id ? -1 : 1));
+  c._tk = out; c._tkW = tkWin;
+  return out;
+}
+
+function tkRecall(c){
+  if(!TK_BY_ID) return null;
+  const r = {all: 0, here: 0, other: 0, alone: 0, split: 0};
+  for(const x of ticketsOf(c)){
+    const k = TK[x.k];
+    if(k.na == null) return null;
+    const out = Math.max(0, k.na - x.als.length), alone = Math.min(out, k.nz || 0);
+    r.all += Math.max(k.na, x.als.length); r.here += x.als.length;
+    r.alone += alone; r.other += out - alone;
+    if(out) r.split++;
+  }
+  return r;
+}
+
+const WHY_OUT = {
+  late: o => 'never paired: it fired '+dur(o[6])+' from its ticket\'s alarms there, past the '+
+             dur(M.pair_window_sec || 900)+' window in which the graph pairs alarms',
+  far:  o => 'never paired, though within that window: too far apart, or crowded out of its nearest candidates',
+  low:  o => 'paired, but its best score '+o[5].toFixed(2)+' is under '+M.score_cut,
+  avg:  o => 'a pair scored '+o[5].toFixed(2)+', but the average between the two groups stayed under '+M.score_cut};
+const WHY_SHORT = [['late', 'too late to pair'], ['far', 'never paired'], ['low', 'scored low'],
+                   ['avg', 'average refused']];
+function outsideBlock(n, k){
+  if(!k.out || !k.out.length) return '';
+  const main = n.als && n.als.length === k.hn, cnt = {};
+  for(const o of k.out) cnt[o[3]] = (cnt[o[3]] || 0) + 1;
+  let h = '<h2 style="margin-top:14px">Its alarms outside its main '+(M.by_incident ? 'incident' : 'cluster')+'</h2>'+
+    (main ? '' : '<div class="hint" style="margin:0 0 6px">told against its main one ('+fmt(k.hn)+
+                 ' of its alarms), not this one</div>')+
+    row('outside', fmt(k.no)+(k.no > k.out.length ? ' (the '+k.out.length+' nearest in time below)' : ''))+
+    row('why', WHY_SHORT.filter(([c]) => cnt[c]).map(([c, l]) => l+' '+cnt[c]).join(' '+DEG+' '));
+  for(const o of k.out.slice(0, 12)){
+    const nm = shortName(G.strings[o[1]]);
+    h += '<div class="row"><span><b style="color:#fff">'+esc(G.strings[o[0]])+'</b> '+esc(nm.name)+'</span><span>'+
+      (o[6] ? dur(o[6])+' apart' : 'same second')+' '+DEG+' '+
+      (o[7] == null ? 'no place' : o[7] < .05 ? 'same place' : o[7]+' km')+' '+DEG+' '+
+      (o[4] === 'alone' ? 'in no cluster' : 'in another')+'</span></div>'+
+      '<div class="hint" style="margin:-2px 0 6px">'+esc(WHY_OUT[o[3]](o))+'</div>';
+  }
+  if(k.no > 12) h += '<div class="hint">+'+fmt(k.no - 12)+' more</div>';
+  return h;
+}
+
+const tkPartial = n => n.type === 'ticket' && n.als && TK[n.ref].na != null &&
+                       n.als.length < TK[n.ref].na;
+
+const tkElsewhere = (k, here) => {
+  const out = Math.max(0, k.na - here), alone = Math.min(out, k.nz || 0), cl = out - alone;
+  const inMain = k.hn && here !== k.hn && k.hn <= cl ? k.hn : 0;
+  return [cl ? fmt(cl)+' in another cluster'+(inMain ? ' ('+fmt(inMain)+' in its main one'+
+                (cl > inMain ? ', '+fmt(cl - inMain)+' in others' : '')+')' : '') : '',
+          alone ? fmt(alone)+' in no cluster' : ''].filter(Boolean).join(' &#183; ');
+};
+const sgn = d => (d < 0 ? '−' : '+') + dur(d);
+let tkSites = new Set();
+
+if(HAS_TK){
+  const winLab = m => 'tickets &#177;' + (m < 60 ? m + ' min' : +(m/60).toFixed(1) + ' h');
+  const el = $('tkWinSel');
+  el.innerHTML = TK_WINS.concat(TK_WINS.includes(tkWin/60) ? [] : [tkWin/60])
+    .sort((x, y) => x - y)
+    .map(m => '<option value="'+m+'"'+(m*60 === tkWin ? ' selected' : '')+'>'+
+              winLab(m)+'</option>').join('');
+  el.hidden = TK_BY_ID;
+  el.onchange = () => {
+    tkWin = +el.value * 60;
+    prefSet('tkWin', +el.value);
+    renderList();
+    if(curIdx < 0 || !clusters[curIdx]) return;
+
+    sel = null; hover = null;
+    playerSetup(); initSim(); showCluster();
+  };
+}
+
+const LIST_CAP = 800;
+const tkCount = {of: null, n: 0};
+
+const bestTxt = c => c.best > -1e9 ? c.best.toFixed(2) : DASH;
+function renderList(){
+  const q = $('q').value.trim().toUpperCase();
+  filtered = clusters.map((c,i)=>i).filter(i => {
+    const c = clusters[i];
+
+    if(q && !c.sites.some(s => G.sites[s].n.includes(q)) &&
+       !c.al.some(i => G.alarms[i].l && Object.values(G.alarms[i].l).some(
+         v => String(G.strings[v]).toUpperCase().includes(q))) &&
+
+       !ticketsOf(c).some(x => String(TK[x.k].id).toUpperCase().includes(q) ||
+                               String(TK[x.k].tt || '').includes(q))) return false;
+    return true;
+  });
+  const mode = $('sort').value;
+  filtered.sort((x,y)=>{
+    const a = clusters[x], b = clusters[y];
+    if(mode==='tickets' && HAS_TK)
+      return (ticketsOf(b).length-ticketsOf(a).length) || (b.al.length-a.al.length);
+    if(mode==='size' || mode==='tickets') return (b.al.length-a.al.length) || (b.best-a.best);
+
+    if(mode==='sites') return (b.nSites-a.nSites) || (b.al.length-a.al.length);
+    return b.best-a.best;
+  });
+  const tot = clusters.reduce((s,c)=>s+c.al.length, 0);
+
+  const drawn = clusters.reduce((s,c)=>s+c.es.length, 0);
+
+  if(HAS_TK && tkCount.of !== clusters){
+    const ks = new Set();
+    for(const c of clusters) for(const x of ticketsOf(c)) ks.add(x.k);
+    tkCount.of = clusters; tkCount.n = ks.size;
+  }
+  $('ccount').textContent =
+    fmt(clusters.length)+' clusters from '+fmt(tot)+' alarms'+
+    (HAS_TK ? ' '+DEG+' '+fmt(tkCount.n)+' tickets' : '')+
+    (filtered.length!==clusters.length ? ' ('+fmt(filtered.length)+' shown)' : '')+
+
+    (DAYS.length > 1 && $('day').value ? '  '+DEG+'  '+$('day').value : '');
+  $('acc').innerHTML = verifiedLine();
+
+  $('cards').innerHTML = filtered.slice(0, LIST_CAP).map(i => {
+    const c = clusters[i];
+    const badges = c.badges.map(b =>
+      '<span class="chip" style="background:'+catColor(b)+'">'+G.strings[b]+'</span>').join('');
+
+    const nt = HAS_TK ? ticketsOf(c).length : 0;
+    return '<div class="card'+(i===curIdx?' sel':'')+'" data-i="'+i+'">'+
+      '<div class="top"><b>'+fmt(c.al.length)+' alarms '+DEG+' '+
+        fmt(c.nSites)+' sites'+
+        (nt ? ' '+DEG+' <span title="the tickets its alarms carry">'+
+              fmt(nt)+' ticket'+(nt === 1 ? '' : 's')+'</span>' : '')+'</b>'+
+
+        '</div>'+
+      '<div class="sub">'+badges+
+      '<span>'+fmt(c.es.length)+' pairs</span>'+
+      '</div></div>';
+  }).join('') || '<div style="padding:16px;color:var(--dim)">no clusters match</div>';
+  for(const el of $('cards').querySelectorAll('.card'))
+    el.onclick = () => selectCluster(+el.dataset.i);
+}
+
+const cv = $('cv'), ctx = cv.getContext('2d'), tip = $('tip');
+let cam = {x:0,y:0,k:1}, N = [], E = [], raf = null, ticks = 0;
+let hover = null, sel = null, drag = null;
+
+let nodeOfAlarm = new Map();
+
+let sitesPinned = true;
+let nCorr = 0;
+const DENSE = 120;
+
+const alarmR = o => Math.max(2.6, Math.min(8, 2 + Math.sqrt(o)*1.1));
+
+const siteR  = a => 6;
+
+const ROLE_RANK = {DN:0, GRP:0, GR:0, PN:1, RN:2, AN:2, GM:2, CPE:3};
+const RANK_GAP = 126, SIB_GAP = 112, COMP_GAP = 170;
+function roleRank(s){
+  let best = 4;
+  for(const pair of (s.r || [])){
+    const v = ROLE_RANK[G.strings[pair[0]]];
+    if(v != null && v < best) best = v;
+  }
+  return best;
+}
+function tidySites(sites){
+
+  const inC = new Set(sites);
+  const nb = new Map(sites.map(
+    s => [s, (topoOf.get(s)||[]).filter(o => inC.has(o))]));
+  const bfsFar = from => {
+    const seen = new Set([from]), q = [from];
+    let last = from;
+    while(q.length){
+      const v = q.shift(); last = v;
+      for(const o of nb.get(v)) if(!seen.has(o)){ seen.add(o); q.push(o); }
+    }
+    return last;
+  };
+
+  const rootOf = comp => {
+    const roles = comp.map(s => roleRank(G.sites[s]));
+    const minR = roles.reduce((a,b) => Math.min(a,b), 4);
+    const maxDeg = comp.reduce((a,s) => Math.max(a, nb.get(s).length), 0);
+    const pick = ok => comp.filter(ok).sort((a,b) =>
+      nb.get(b).length - nb.get(a).length || G.sites[b].a - G.sites[a].a ||
+      (G.sites[a].n < G.sites[b].n ? -1 : 1))[0];
+
+    if(minR <= 2 && roles.some(r => r > minR))
+      return pick(s => roleRank(G.sites[s]) === minR);
+
+    if(maxDeg >= 3 && maxDeg*2 >= comp.length-1) return pick(() => true);
+    return bfsFar(bfsFar(comp[0]));
+  };
+
+  const seen = new Set(), comps = [];
+  for(const s of sites){
+    if(seen.has(s)) continue;
+    const comp = [], q = [s];
+    seen.add(s);
+    while(q.length){
+      const v = q.shift(); comp.push(v);
+      for(const o of nb.get(v)) if(!seen.has(o)){ seen.add(o); q.push(o); }
+    }
+    comps.push(comp);
+  }
+  const solo = comps.filter(x => x.length === 1).map(x => x[0]);
+  const trees = comps.filter(x => x.length > 1)
+                     .sort((a,b) => b.length - a.length);
+
+  const pos = new Map();
+  let ox = 0;
+  for(const comp of trees){
+    const root = rootOf(comp);
+    const rank = new Map([[root,0]]);
+    const rows = [[root]];
+    const q = [root];
+    while(q.length){
+      const v = q.shift();
+      for(const o of nb.get(v)) if(!rank.has(o)){
+        const r = rank.get(v)+1;
+        rank.set(o, r);
+        (rows[r] || (rows[r] = [])).push(o);
+        q.push(o);
+      }
+    }
+
+    const idx = new Map();
+    const reindex = () => rows.forEach(rw => rw.forEach((s,i) => idx.set(s,i)));
+    const bary = (s, r) => {
+      const ns = nb.get(s).filter(o => rank.get(o) === r);
+      return ns.length ? ns.reduce((a,o) => a+idx.get(o), 0)/ns.length
+                       : idx.get(s);
+    };
+    const order = r => {
+      const key = new Map(rows[r[0]].map(s => [s, bary(s, r[1])]));
+      rows[r[0]].sort((a,b) => key.get(a)-key.get(b) ||
+                               (G.sites[a].n < G.sites[b].n ? -1 : 1));
+      reindex();
+    };
+    reindex();
+    for(let pass=0; pass<2; pass++){
+      for(let r=1;r<rows.length;r++) order([r, r-1]);
+      for(let r=rows.length-2;r>=0;r--) order([r, r+1]);
+    }
+
+    let lo = Infinity, hi = -Infinity;
+    for(let r=0;r<rows.length;r++){
+      const want = rows[r].map(s => {
+        const ps = nb.get(s).filter(o => rank.get(o) === r-1 && pos.has(o));
+        return ps.length ? ps.reduce((a,o) => a+pos.get(o).x, 0)/ps.length
+                         : null;
+      });
+      let x = 0;
+      for(let i=0;i<rows[r].length;i++){
+        const w = want[i] == null ? (i ? x + SIB_GAP : 0) : want[i];
+        x = i === 0 ? w : Math.max(w, x + SIB_GAP);
+        pos.set(rows[r][i], {x, y: r*RANK_GAP});
+      }
+      const asked = want.filter(v => v != null);
+      if(asked.length){
+        const mid = asked.reduce((a,b) => a+b, 0)/asked.length;
+        const got = rows[r].reduce((a,s) => a+pos.get(s).x, 0)/rows[r].length;
+        for(const s of rows[r]) pos.get(s).x += mid - got;
+      }
+      for(const s of rows[r]){
+        if(pos.get(s).x < lo) lo = pos.get(s).x;
+        if(pos.get(s).x > hi) hi = pos.get(s).x;
+      }
+    }
+    for(const s of comp) pos.get(s).x += ox - lo;
+    ox += (hi - lo) + COMP_GAP;
+  }
+
+  if(solo.length){
+    const cols = Math.ceil(Math.sqrt(solo.length));
+    solo.sort((a,b) => G.sites[a].n < G.sites[b].n ? -1 : 1);
+    solo.forEach((s,i) => pos.set(s, {x: ox + (i%cols)*SIB_GAP,
+                                      y: Math.floor(i/cols)*RANK_GAP}));
+  }
+
+  let cx=0, cy=0;
+  for(const s of sites){ cx += pos.get(s).x; cy += pos.get(s).y; }
+  cx /= sites.length; cy /= sites.length;
+  for(const s of sites){ const p = pos.get(s); p.x -= cx; p.y -= cy; }
+  return pos;
+}
+
+function initSim(){
+  const c = clusters[curIdx];
+  curVia = c.via || new Set();
+  N = []; E = [];
+  const localA = new Map(), localS = new Map();
+  const nS = c.sites.length;
+
+  const tidy = $('tidy').checked;
+
+  const pos = mapOn ? geoSites(c.sites) : tidy ? tidySites(c.sites) : null;
+  sitesPinned = !!pos;
+  c.sites.forEach((s,k) => {
+    const ang = k/Math.max(1,nS)*6.2832, R = Math.max(45, nS*15);
+    const p = pos ? pos.get(s) : {x:Math.cos(ang)*R, y:Math.sin(ang)*R};
+    localS.set(s, N.length);
+    N.push({x:p.x, y:p.y, vx:0, vy:0,
+            fx: pos ? p.x : null, fy: pos ? p.y : null,
+            type:'site', ref:s});
+  });
+
+  const neNode = new Map();
+  SUBZ = {}; LIFT = 0;
+  if(HAS_NE && $('neStack').checked){
+    const inS = new Set(c.sites), want = new Set(), hot = new Set();
+    for(const i of c.al){
+      const k = G.alarms[i].ne;
+      if(k == null) continue;
+      hot.add(k); want.add(k);
+      if(NES[k].p != null) want.add(NES[k].p);
+    }
+    NES.forEach((r, k) => { if(r.st && inS.has(r.s)) want.add(k); });
+    const keep = [...want].filter(k => inS.has(NES[k].s)).sort((x, y) => x - y);
+    const present = new Set(keep.map(k => neFloor(NES[k].k)));
+    let m = 0;
+    for(const fl of ['T', 'R', 'C']) if(present.has(fl)) SUBZ[fl] = SUB_STEP*(++m);
+
+    LIFT = m ? SUB_STEP*m - 0.2 : 0;
+    const RANK = {AGG:0, AC:1, CPE:2, IPRAN:3, DWDM:4, BB:5, OTHER:6, RAN:7};
+    const group = new Map();
+    for(const k of keep){
+      const fl = neFloor(NES[k].k);
+      if(fl === 'C') continue;
+      const key = NES[k].s+'|'+fl;
+      if(!group.has(key)) group.set(key, []);
+      group.get(key).push(k);
+    }
+    for(const l of group.values()){
+      l.sort((x, y) => (RANK[NES[x].k] ?? 9) - (RANK[NES[y].k] ?? 9) ||
+                       (G.strings[NES[x].n] < G.strings[NES[y].n] ? -1 : 1));
+      const sn = localS.get(NES[l[0]].s), fl = neFloor(NES[l[0]].k);
+      l.forEach((k, j) => {
+        const R = 8 + 2.5*l.length, ang = j/l.length*6.2832 + (fl === 'R' ? 0.6 : 0);
+        const off = l.length === 1 ? {x:0, y:0} : {x: Math.cos(ang)*R, y: Math.sin(ang)*R};
+        neNode.set(k, N.length);
+        N.push({x:N[sn].x+off.x, y:N[sn].y+off.y, vx:0, vy:0, fx:null, fy:null,
+                type:'ne', ref:k, fl, sn, anchor:sn, off, hot: hot.has(k)});
+      });
+    }
+
+    const cellsOf = new Map();
+    for(const k of keep){
+      if(neFloor(NES[k].k) !== 'C') continue;
+      const pn = NES[k].p != null && neNode.has(NES[k].p) ? neNode.get(NES[k].p) : localS.get(NES[k].s);
+      if(!cellsOf.has(pn)) cellsOf.set(pn, []);
+      cellsOf.get(pn).push(k);
+    }
+    for(const [pn, l] of cellsOf){
+      l.forEach((k, j) => {
+        const r = 7 + 4.5*Math.sqrt(j), ang = j*2.39996;
+        const off = {x: Math.cos(ang)*r, y: Math.sin(ang)*r};
+        neNode.set(k, N.length);
+
+        N.push({x:N[pn].x+off.x, y:N[pn].y+off.y, vx:0, vy:0, fx:null, fy:null,
+                type:'ne', ref:k, fl:'C', sn: N[pn].type === 'ne' ? N[pn].sn : pn, anchor:pn, off, hot: hot.has(k)});
+        E.push({a:pn, b:N.length-1, len:0, w:0, kind: N[pn].type === 'ne' ? 'necell' : 'nepost'});
+      });
+    }
+
+    const tied = new Set();
+    for(const [i, j, kd] of NELINKS){
+      const a_ = neNode.get(i), b_ = neNode.get(j);
+      if(a_ == null || b_ == null) continue;
+      E.push({a:a_, b:b_, len:0, w:0, kind: kd === 1 ? 'nex2' : 'nelink'});
+      if(kd === 0 && N[a_].sn === N[b_].sn && N[a_].fl !== N[b_].fl)
+        tied.add(SUBZ[N[a_].fl] > SUBZ[N[b_].fl] ? a_ : b_);
+    }
+
+    for(const k of keep){
+      const q = neNode.get(k);
+      if(q == null || N[q].fl === 'C' || tied.has(q)) continue;
+      E.push({a:N[q].sn, b:q, len:0, w:0, kind:'nepost'});
+    }
+  }
+
+  const at = i => G.alarms[i].t ?? Infinity;
+  const bySite = new Map();
+  for(const i of c.al){
+    const s = G.alarms[i].s;
+    if(!bySite.has(s)) bySite.set(s, []);
+    bySite.get(s).push(i);
+  }
+  for(const l of bySite.values()) l.sort((x, y) => at(x) - at(y));
+  const SPIRAL = 11, GOLDEN = 2.39996;
+  for(const [s, l] of bySite){
+    const sn = localS.get(s), dv = neNode.get(G.alarms[l[0]].ne);
+    localA.set(l[0], N.length);
+    N.push({x:N[sn].x, y:N[sn].y, vx:0, vy:0, fx:null, fy:null,
+            type:'alarm', ref:l[0], sn, anchor:sn, off:null});
+
+    E.push({a: dv != null ? dv : sn, b:N.length-1, len:0, w:0, kind:'spoke', dev: dv != null});
+
+    if(dv != null && N[dv].sn !== sn) E.push({a:sn, b:N.length-1, len:0, w:0, kind:'spoke', home:true});
+  }
+  for(const [s, l] of bySite){
+    const sn = localS.get(s), root = localA.get(l[0]);
+    for(let j = 1; j < l.length; j++){
+      const r = 10 + SPIRAL*Math.sqrt(j), ang = j*GOLDEN;
+      const off = {x: Math.cos(ang)*r, y: Math.sin(ang)*r};
+      localA.set(l[j], N.length);
+      N.push({x:N[root].x+off.x, y:N[root].y+off.y, vx:0, vy:0, fx:null, fy:null,
+              type:'alarm', ref:l[j], sn, anchor:root, off});
+      E.push({a:root, b:N.length-1, len:0, w:0, kind:'spoke', branch:true});
+
+      const dv = neNode.get(G.alarms[l[j]].ne);
+      if(dv != null && dv !== neNode.get(G.alarms[l[0]].ne))
+        E.push({a:dv, b:N.length-1, len:0, w:0, kind:'anc'});
+    }
+  }
+  const bundles = new Map();
+  for(const e of c.es){
+    const sa = G.alarms[e.i].s, sb = G.alarms[e.j].s;
+    if(sa !== sb){
+      const key = sa < sb ? sa+':'+sb : sb+':'+sa;
+      if(!bundles.has(key)) bundles.set(key, []);
+      bundles.get(key).push(E.length);
+    }
+    E.push({a:localA.get(e.i), b:localA.get(e.j), len:56, w:1, kind:'corr', ref:e});
+  }
+
+  const tkOf = i => { const l = G.alarms[i].l;
+    return l && l.TICKETID != null ? String(G.strings[l.TICKETID]).split(' ') : []; };
+  const byTk = new Map();
+  for(const i of c.al) for(const t of tkOf(i)){
+    if(!byTk.has(t)) byTk.set(t, []);
+    byTk.get(t).push(i);
+  }
+  for(const i of c.al){
+    if(!G.alarms[i].tg) continue;
+    let best = null, bd = Infinity;
+    for(const t of tkOf(i)){
+      const own = (byTk.get(t) || []).filter(j => j !== i);
+      const linked = own.filter(j => !G.alarms[j].tg);
+      const pool = linked.length ? linked : own.filter(j => at(j) < at(i) || (at(j) === at(i) && j < i));
+      for(const j of pool){ const d = Math.abs(at(j) - at(i)); if(d < bd){ bd = d; best = j; } }
+    }
+    if(best != null) E.push({a:localA.get(best), b:localA.get(i), len:0, w:0, kind:'held'});
+  }
+
+  for(const ks of bundles.values()){
+    const e0 = E[ks[0]];
+    E.push({a:localA.get(first0(e0.ref.i)), b:localA.get(first0(e0.ref.j)),
+            len:0, w:0, kind:'bundle', ks});
+  }
+  function first0(i){ return bySite.get(G.alarms[i].s)[0]; }
+  const seen = new Set();
+  for(const s of c.sites) for(const o of (topoOf.get(s)||[])){
+    if(!localS.has(o)) continue;
+    const key = s<o ? s+':'+o : o+':'+s;
+    if(seen.has(key)) continue;
+    seen.add(key);
+    E.push({a:localS.get(s), b:localS.get(o), len:105, w:1.3, kind:'topo'});
+  }
+
+  const tkAt = new Map(), synAt = new Map();
+  tkSites = new Set();
+  for(const x of ticketsOf(c)){
+
+    const k = TK[x.k], sAt = x.als ? G.alarms[x.a].s : k.s, sn = localS.get(sAt);
+    if(sn == null) continue;
+    tkSites.add(sAt);
+    const j = tkAt.get(sAt) || 0;
+    tkAt.set(sAt, j + 1);
+    const r = 17 + 9*Math.sqrt(j), ang = Math.PI + j*GOLDEN;
+    const off = {x: Math.cos(ang)*r, y: Math.sin(ang)*r};
+    N.push({x:N[sn].x+off.x, y:N[sn].y+off.y, vx:0, vy:0, fx:null, fy:null,
+            type:'ticket', ref:x.k, sn, anchor:sn, off, d:x.d, near:x.a, als:x.als});
+    const me = N.length-1;
+    const own = (x.als || []).map(i => localA.get(i)).filter(q => q != null);
+
+    const sQ = own.find(q => { const A = G.alarms[N[q].ref];
+      return alarmSyn(A) && A.l.TICKETID != null && G.strings[A.l.TICKETID].split(' ').includes(k.id); });
+    if(sQ != null)
+      for(const q of own) if(q !== sQ && !alarmSyn(G.alarms[N[q].ref]))
+        E.push({a: q, b: sQ, len: 0, w: 0, kind: 'synjudge', tk: x.k});
+
+    let to = me;
+    if(SYN_LOW && k.syn){
+      N.push({x:0, y:0, vx:0, vy:0, fx:null, fy:null, type:'syn', ref:k.syn, tk:x.k,
+              cent:[me], off:{x:0, y:0}});
+      placeAnchored(N[N.length-1]);
+      to = N.length-1;
+      E.push({a:to, b:me, len:0, w:0, kind:'tklink', up:true});
+    }
+    const lk = to === me ? 'tklink' : 'synlink';
+    if(own.length) for(const q of own) E.push({a:q, b:to, len:0, w:0, kind:lk, up:true});
+    else E.push({a:sn, b:to, len:0, w:0, kind:lk, up:true});
+    if(k.syn && !SYN_LOW){
+      if(!synAt.has(k.syn)) synAt.set(k.syn, []);
+      synAt.get(k.syn).push(N.length-1);
+    }
+  }
+
+  if(HAS_WO){
+    const tkNodes = [];
+    N.forEach((n, i) => { if(n.type === 'ticket') tkNodes.push(i); });
+    for(const m of tkNodes){
+      const ws = TK[N[m].ref].wo || [];
+      ws.forEach((w, j) => {
+        const r = j ? 11*Math.sqrt(j) : 0, ang = j*GOLDEN;
+        N.push({x:0, y:0, vx:0, vy:0, fx:null, fy:null, type:'wo', tk:N[m].ref, w:j,
+                cent:[m], off:{x: Math.cos(ang)*r, y: Math.sin(ang)*r}});
+        placeAnchored(N[N.length-1]);
+        E.push({a:m, b:N.length-1, len:0, w:0, kind:'wolink', up:true});
+      });
+    }
+  }
+
+  if(SYN_LOW){
+    const sn = [];
+    N.forEach((n, i) => { if(n.type === 'syn' && n.tk != null) sn.push(i); });
+    for(let x = 0; x < sn.length; x++) for(let y = x + 1; y < sn.length; y++)
+      E.push({a: sn[x], b: sn[y], len: 0, w: 0, kind: 'synsyn'});
+  }
+
+  wallBands = [];
+  if(HAS_RC){
+    const byCat = new Map();
+    N.forEach((n, i) => {
+      if(n.type !== 'ticket') return;
+      const r = rcKey(TK[n.ref]);
+      if(!r) return;
+      if(!byCat.has(r.name)) byCat.set(r.name, {cause: r.cause, members: []});
+      byCat.get(r.name).members.push(i);
+    });
+
+    const cats = [...byCat].sort((x, y) => y[1].members.length - x[1].members.length);
+    wallBands = cats.map(([name, v]) => ({name, cause: v.cause, members: v.members}));
+    wallBands.forEach((b, j) => {
+      const r = j ? 16*Math.sqrt(j) : 0, ang = j*GOLDEN;
+      N.push({x:0, y:0, vx:0, vy:0, fx:null, fy:null, type:'rc', ref:b.name, cause:b.cause,
+              band:j, cent:b.members, off:{x: Math.cos(ang)*r, y: Math.sin(ang)*r}});
+      placeAnchored(N[N.length-1]);
+      for(const m of b.members) E.push({a:m, b:N.length-1, len:0, w:0, kind:'rcup', up:true});
+    });
+  }
+  let sj = 0;
+  for(const [name, members] of synAt){
+
+    const r = sj ? 12*Math.sqrt(sj) : 0, ang = sj*GOLDEN;
+    N.push({x:0, y:0, vx:0, vy:0, fx:null, fy:null, type:'syn', ref:name,
+            cent:members, off:{x: Math.cos(ang)*r, y: Math.sin(ang)*r}});
+    placeAnchored(N[N.length-1]);
+    for(const m of members) E.push({a:m, b:N.length-1, len:0, w:0, kind:'synlink'});
+    sj++;
+  }
+  markBackbone();
+  nodeOfAlarm = localA;
+  ticks = 0;
+  if(raf) cancelAnimationFrame(raf);
+  step();
+}
+
+function markBackbone(){
+  const corr = E.filter(e => e.kind === 'corr');
+  const late = e => Math.max(G.alarms[N[e.a].ref].t || 0,
+                             G.alarms[N[e.b].ref].t || 0);
+  corr.sort((x, y) => late(x) - late(y) || y.ref.s - x.ref.s);
+  const par = N.map((_, i) => i);
+  const find = x => { while(par[x] !== x){ par[x] = par[par[x]]; x = par[x]; }
+                      return x; };
+  for(const e of corr){
+    const ra = find(e.a), rb = find(e.b);
+    e.bb = ra !== rb;
+    if(e.bb) par[ra] = rb;
+  }
+  nCorr = corr.length;
+  applyLineMode();
+}
+
+function applyLineMode(){
+  for(const e of E)
+    if(e.kind === 'corr') e.w = (lineMode === 'all' || e.bb) ? 1 : 0;
+}
+const corrHidden = (e, k) =>
+  (e.kind === 'corr' && !litE.has(k) &&
+   (lineMode === 'site' || (lineMode === 'bb' && !e.bb))) ||
+  (e.kind === 'bundle' && lineMode !== 'site');
+
+const bundleShown = e => e.ks.filter(k => edgeShown(E[k]));
+function bundleColor(ks){
+  const ms = ks.map(k => E[k].ref);
+  if(ticketMode){
+    if(ms.some(m => m.v === -1)) return ms.some(m => m.v === 1) ? EDGE_MID : EDGE_BAD;
+    return ms.some(m => m.v === 1) ? EDGE_OK : ECOL;
+  }
+  if(!VERIFIED) return ECOL;
+  const js = ms.filter(judgedE);
+  if(!js.length) return ECOL;
+  const f = js.filter(m => m.dc <= tolOf(m)).length / js.length;
+  return f === 1 ? EDGE_OK : f >= 0.5 ? EDGE_MID : EDGE_BAD;
+}
+
+function placeAnchored(p){
+  if(p.cent){
+    let x = 0, y = 0;
+    for(const m of p.cent){ x += N[m].x; y += N[m].y; }
+    p.x = x/p.cent.length + p.off.x; p.y = y/p.cent.length + p.off.y;
+    return;
+  }
+  const q = N[p.anchor];
+  p.x = q.x + (p.off ? p.off.x : 0); p.y = q.y + (p.off ? p.off.y : 0);
+}
+function tick(){
+  const t = Math.max(.05, 1 - ticks/200), CELL=32, REP=780;
+  const grid = new Map();
+  N.forEach((p,i) => {
+    const k = (Math.floor(p.x/CELL)+8192)*16384 + (Math.floor(p.y/CELL)+8192);
+    let b = grid.get(k); if(!b) grid.set(k, b=[]);
+    b.push(i);
+  });
+  N.forEach((p,i) => {
+    const gx=Math.floor(p.x/CELL), gy=Math.floor(p.y/CELL);
+    for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){
+      const b = grid.get((gx+dx+8192)*16384 + (gy+dy+8192));
+      if(!b) continue;
+      for(const j of b){
+        if(j===i) continue;
+        const q = N[j];
+
+        if(q.type !== p.type) continue;
+        let ux=p.x-q.x, uy=p.y-q.y, d2=ux*ux+uy*uy;
+        if(d2 > CELL*CELL*4) continue;
+        if(d2 < .02){ ux=Math.random()-.5; uy=Math.random()-.5; d2=.02; }
+
+        const d=Math.sqrt(d2), f=Math.min(REP/d2, 48)*t;
+        p.vx += ux/d*f; p.vy += uy/d*f;
+      }
+    }
+  });
+  for(const e of E){
+    const p=N[e.a], q=N[e.b];
+    const ux=q.x-p.x, uy=q.y-p.y, d=Math.hypot(ux,uy)||1e-6;
+    const f=(d-e.len)*.02*e.w*t;
+    p.vx += ux/d*f; p.vy += uy/d*f; q.vx -= ux/d*f; q.vy -= uy/d*f;
+  }
+  for(const p of N){
+    if(p.fx!=null){ p.x=p.fx; p.y=p.fy; p.vx=0; p.vy=0; continue; }
+
+    if(p.anchor!=null || p.cent || p.wall){ placeAnchored(p); p.vx=0; p.vy=0; continue; }
+    p.vx*=.82; p.vy*=.82; p.x+=p.vx; p.y+=p.vy;
+
+    if(!sitesPinned){ p.x*=1-.003*t; p.y*=1-.003*t; }
+  }
+}
+function step(){
+  for(let i=0;i<3 && ticks<200;i++,ticks++) tick();
+  draw();
+  raf = ticks<200 ? requestAnimationFrame(step) : null;
+}
+function resize(){
+  const r = cv.getBoundingClientRect(), dpr = devicePixelRatio||1;
+  cv.width=r.width*dpr; cv.height=r.height*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  placeNow();
+  draw();
+}
+
+let view3d = true;
+
+let yaw  = Math.PI/4;
+let elev = 0.45;
+
+let LAYER_H = 100;
+const LAYER_FRACTION = 0.30, LAYER_MIN = 45, LAYER_MAX = 135;
+
+const SYN_LOW = !!TKM.synthetic_below;
+const TK_Z = SYN_LOW ? 2.6 : 1.8, SYN_Z = SYN_LOW ? 1.8 : 2.6;
+const TKC = '#bc8cff', SYNC = '#f778ba';
+
+const RC_Z = Math.max(TK_Z, SYN_Z) + 0.8;
+const WO_Z = (HAS_RC ? RC_Z : Math.max(TK_Z, SYN_Z)) + 0.8, WOC = '#2dd4bf', WO_NONE = '#6e7681', WO_R = 5;
+
+const RCC = '#e3b341', RC_NONE = '#6e7681', RC_R = 4.5, WALL_GAP = 90;
+let wallBands = [];
+
+const rcR = n => RC_R + 1.6*Math.sqrt(Math.max(0, wallBands[n.band].members.length - 1));
+const RC_TIER = (+((/(\d)\s*$/.exec(RC_BY) || [0, 2])[1])) - 1;
+
+function rcKey(k){
+  if(k.rj) return {name: k.rj, cause: true};
+  if(k.rc) return {name: k.rc[RC_TIER] || '(blank)', cause: false};
+  return null;
+}
+function alarmSyn(a){ return !!(a && a.l && a.l.SYNTHETIC != null); }
+
+function synAlarmHere(n){
+  const c = clusters[curIdx], id = TK[n.tk].id;
+  if(!c) return null;
+  for(const i of c.al){
+    const a = G.alarms[i];
+    if(alarmSyn(a) && a.l.TICKETID != null && G.strings[a.l.TICKETID].split(' ').includes(id)) return i;
+  }
+  return null;
+}
+
+function synWhere(n){
+  if(synAlarmHere(n) != null) return 'in this cluster (pink, on the alarm layer)';
+  const w = TK[n.tk].sw;
+  return w === 'cl' ? 'in another cluster'
+    : w === 'alone' ? 'in no cluster: the model linked it to nothing'
+    : w === 'none' ? '<span style="color:var(--dim)">not among the day\'s graph alarms (no place, or it did not fire this day)</span>'
+    : DASH;
+}
+
+function clearVerdict(ca, cb, tols, flatOk){
+  if(ca == null || cb == null) return null;
+  const ts = tols.filter(v => v != null);
+  const flat = !ts.length;
+  const tol = !flat ? Math.max(...ts) : (flatOk || !M.coclear_by_kind ? M.coclear_tol_sec : null);
+  if(tol == null) return null;
+  const dc = Math.abs(ca - cb);
+  return {dc, tol, ok: dc <= tol, flat};
+}
+function synJudgeInfo(e){
+  if(e.kind === 'synjudge'){
+    const A = G.alarms[N[e.a].ref], S = G.alarms[N[e.b].ref];
+    return clearVerdict(A.ct, S.ct, [A.tol, S.tol], false);
+  }
+  if(e.kind === 'synsyn'){
+    const a = TK[N[e.a].tk], b = TK[N[e.b].tk];
+    return clearVerdict(a.sc, b.sc, [a.stl, b.stl], true);
+  }
+  return null;
+}
+
+const zOf = n => !view3d ? 0
+  : n.type === 'ne' ? LAYER_H*(SUBZ[n.fl] || 0)
+  : n.type === 'alarm' ? LAYER_H*(1+LIFT)
+  : n.type === 'ticket' ? LAYER_H*(TK_Z+LIFT)
+  : n.type === 'syn' ? LAYER_H*(SYN_Z+LIFT)
+  : n.type === 'rc' ? LAYER_H*(RC_Z+LIFT)
+  : n.type === 'wo' ? LAYER_H*(WO_Z+LIFT) : 0;
+
+function layoutBox(){
+  let x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity;
+  for(const n of N){
+    if(n.wall) continue;
+    if(n.x<x0) x0=n.x;
+    if(n.x>x1) x1=n.x;
+    if(n.y<y0) y0=n.y;
+    if(n.y>y1) y1=n.y;
+  }
+  return {x0, y0, x1, y1, span: Math.max(x1-x0, y1-y0, 1)};
+}
+
+function scrXYZ(x, y, z){
+  const cw = view3d ? Math.cos(yaw)  : 1, sw = view3d ? Math.sin(yaw)  : 0;
+  const ce = view3d ? Math.cos(elev) : 0, se = view3d ? Math.sin(elev) : 1;
+  const dx = x - cam.x, dy = y - cam.y;
+  const rx = dx*cw - dy*sw, ry = dx*sw + dy*cw;
+  return {x: rx*cam.k + cv.clientWidth/2,
+          y: (ry*se - z*ce)*cam.k + cv.clientHeight/2};
+}
+const scr = p => scrXYZ(p.x, p.y, zOf(p));
+
+let litN = new Set(), litE = new Set(), focusNow = null, dimA = 1;
+
+function plateList(box){
+  const pad = 36;
+  const {x0, y0, x1, y1} = box;
+  const corners = [[x0-pad,y0-pad],[x1+pad,y0-pad],
+                   [x1+pad,y1+pad],[x0-pad,y1+pad]];
+  const L = [{z: 0, col: '#8b949e', base: '#11161d', edge: '#30363d', lab: 'SITES · topology'},
+             {z: LAYER_H*(1+LIFT), col: ALC, lab: 'ALARMS · model pairs'}];
+
+  for(const fl in SUBZ) L.push({z: LAYER_H*SUBZ[fl], col: NE_COL[fl], lab: NE_FLOOR_LAB[fl], dev: true});
+
+  if(N.some(n => n.type === 'ticket')) L.push({z: LAYER_H*(TK_Z+LIFT), col: TKC, lab: 'TICKETS'});
+  if(N.some(n => n.type === 'syn')) L.push({z: LAYER_H*(SYN_Z+LIFT), col: SYNC, lab: 'SYNTHETIC ALARMS'});
+  if(N.some(n => n.type === 'rc'))
+    L.push({z: LAYER_H*(RC_Z+LIFT), col: RCC, lab: 'RESOLUTION · '+RC_BY.replace('Resolution Category ', '').toLowerCase()});
+  if(N.some(n => n.type === 'wo')) L.push({z: LAYER_H*(WO_Z+LIFT), col: WOC, lab: 'WORK ORDERS'});
+  L.sort((a, b) => a.z - b.z);
+  for(const p of L) p.q = corners.map(([x,y]) => scrXYZ(x, y, p.z));
+  return L;
+}
+function drawPlates(box){
+  const L = plateList(box);
+  const path = pts => {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+  };
+  ctx.setLineDash([]); ctx.lineWidth = 1;
+  L.forEach((p, k) => {
+    if(k){
+      ctx.globalAlpha = 1; ctx.strokeStyle = '#30363d';
+      for(let i=0;i<4;i++){
+        ctx.beginPath();
+        ctx.moveTo(L[k-1].q[i].x, L[k-1].q[i].y); ctx.lineTo(p.q[i].x, p.q[i].y);
+        ctx.stroke();
+      }
+    }
+    path(p.q);
+    if(p.base){
+      ctx.globalAlpha = 1; ctx.fillStyle = p.base; ctx.fill();
+      ctx.strokeStyle = p.edge; ctx.stroke();
+    } else if(p.dev){
+
+      ctx.globalAlpha = .035; ctx.fillStyle = p.col; ctx.fill();
+      ctx.globalAlpha = .3; ctx.strokeStyle = p.col; ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+    } else {
+      ctx.globalAlpha = .07; ctx.fillStyle = p.col; ctx.fill();
+      ctx.globalAlpha = .5; ctx.strokeStyle = p.col; ctx.stroke();
+    }
+  });
+  ctx.globalAlpha = 1;
+  platesNow = L;
+
+  wallNow = null;
+}
+let wallNow = null;
+
+function drawWallLabel(){
+
+  if(wallBands.length){
+    const placed = [];
+    ctx.save();
+    ctx.setLineDash([]); ctx.lineJoin = 'round';
+    ctx.font = '10.5px ui-monospace,monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const side = $('detail').getBoundingClientRect(), cvr = cv.getBoundingClientRect();
+    const edgeX = (side.width > 0 && side.left > cvr.left
+                   ? Math.min(cv.clientWidth, side.left - cvr.left) : cv.clientWidth) - 6;
+    for(let i = 0; i < N.length; i++){
+      const n = N[i];
+      if(n.type !== 'rc' || !nodeShown(n)) continue;
+      const b = wallBands[n.band], p = scr(n), r = rcR(n);
+      const txt = (b.name.length > 40 ? b.name.slice(0, 39)+'…' : b.name)+'  '+b.members.length;
+      const w = ctx.measureText(txt).width;
+      const x = p.x + r + 6 + w > edgeX ? p.x - r - 6 - w : p.x + r + 6;
+      ctx.globalAlpha = (!focusNow || litN.has(i)) ? 1 : .25;
+      let y = p.y;
+      while(placed.some(v => Math.abs(v - y) < 13)) y += 13;
+      placed.push(y);
+      ctx.lineWidth = 3; ctx.strokeStyle = onLight() ? '#ffffffe6' : '#0d1117d9';
+      ctx.strokeText(txt, x, y);
+      ctx.fillStyle = b.cause ? RCC : RC_NONE;
+      ctx.fillText(txt, x, y);
+    }
+    ctx.restore();
+  }
+  if(!wallNow) return;
+  let [a, b] = [wallNow.q[3], wallNow.q[2]];
+  if(b.x < a.x) [a, b] = [b, a];
+  if(Math.hypot(b.x - a.x, b.y - a.y) < 20) return;
+  const fs = 12*cam.k;
+  if(fs < 5) return;
+  const sc_ = Math.min(fs, 32)/12;
+  ctx.save();
+  ctx.setLineDash([]); ctx.lineJoin = 'round';
+  ctx.font = '600 '+(12*sc_).toFixed(1)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+  ctx.translate(a.x, a.y); ctx.rotate(Math.atan2(b.y - a.y, b.x - a.x));
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.globalAlpha = .9; ctx.lineWidth = 4*sc_; ctx.strokeStyle = '#0d1117';
+  ctx.strokeText(wallNow.lab, 14*sc_, 4*sc_);
+  ctx.globalAlpha = 1; ctx.fillStyle = wallNow.col;
+  ctx.fillText(wallNow.lab, 14*sc_, 4*sc_);
+  ctx.restore();
+}
+
+function drawPlateLabels(){
+  if(!platesNow) return;
+  platesNow.forEach((p, k) => {
+    const q = p.q;
+
+    let f = 0;
+    for(let i=1;i<4;i++) if(q[i].y > q[f].y) f = i;
+    const e1 = [q[f], q[(f+1)%4]], e2 = [q[(f+3)%4], q[f]];
+    const L_ = e => Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y);
+    let [a, b] = L_(e1) >= L_(e2) ? e1 : e2;
+    if(b.x < a.x) [a, b] = [b, a];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if(len < 20) return;
+    const th = Math.atan2(b.y - a.y, b.x - a.x);
+    const cx = q.reduce((s, v) => s + v.x, 0)/4, cy = q.reduce((s, v) => s + v.y, 0)/4;
+
+    const out = -Math.sin(th)*((a.x + b.x)/2 - cx) + Math.cos(th)*((a.y + b.y)/2 - cy) > 0;
+    const right = false;
+    ctx.save();
+    ctx.setLineDash([]); ctx.lineJoin = 'round';
+    if('letterSpacing' in ctx) ctx.letterSpacing = '0.6px';
+
+    const fs = 12*cam.k;
+    if(fs < 5){ ctx.restore(); return; }
+    const sc_ = Math.min(fs, 32)/12;
+    ctx.font = '600 '+(12*sc_).toFixed(1)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+    ctx.translate(right ? b.x : a.x, right ? b.y : a.y);
+    ctx.rotate(th);
+    ctx.textAlign = right ? 'right' : 'left';
+
+    ctx.textBaseline = out ? 'bottom' : 'top';
+    const tx = (right ? -14 : 14)*sc_, ty = (out ? -4 : 4)*sc_;
+    ctx.globalAlpha = .9; ctx.lineWidth = 4*sc_; ctx.strokeStyle = '#0d1117';
+    ctx.strokeText(p.lab, tx, ty);
+    ctx.globalAlpha = 1; ctx.fillStyle = p.col;
+    ctx.fillText(p.lab, tx, ty);
+    ctx.restore();
+  });
+}
+
+function arrowAt(p, q, size, color, alpha){
+  const dx = q.x-p.x, dy = q.y-p.y, d = Math.hypot(dx, dy);
+  if(d < size*3) return;
+  const ux = dx/d, uy = dy/d;
+  const mx = p.x + dx*0.5, my = p.y + dy*0.5;
+  const bx = mx - ux*size*0.7, by = my - uy*size*0.7;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(mx + ux*size, my + uy*size);
+  ctx.lineTo(bx - uy*size*0.62, by + ux*size*0.62);
+  ctx.lineTo(bx + uy*size*0.62, by - ux*size*0.62);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawEdge(k){
+  const e = E[k];
+  if(!edgeShown(e) || corrHidden(e, k)) return;
+  const p = scr(N[e.a]), q = scr(N[e.b]), lit = litE.has(k);
+
+  const dense = e.kind === 'corr' && lineMode === 'all' && nCorr > DENSE;
+  let al, ks = null;
+  if(e.kind==='bundle'){
+    ks = bundleShown(e);
+    if(!ks.length) return;
+    al = focusNow ? (lit?1:dimA) : .6;
+    ctx.strokeStyle = ink(bundleColor(ks));
+    ctx.globalAlpha = al;
+
+    ctx.lineWidth = Math.min(4.5, 1 + 0.75*Math.log2(ks.length)) + (lit ? 1 : 0);
+    ctx.setLineDash([]);
+  } else if(e.kind==='corr'){
+
+    al = focusNow ? (lit?1:dimA)
+                  : dense ? Math.max(.12, .6*Math.sqrt(DENSE/nCorr)) : .6;
+    ctx.strokeStyle = ink(edgeColor(e.ref));
+    ctx.globalAlpha = al;
+    ctx.lineWidth = lit ? 2.8 : dense ? .8 : onLight() ? 1.8 : 1.4;
+    ctx.setLineDash([]);
+  } else if(e.kind==='tklink' || e.kind==='synlink'){
+
+    al = focusNow ? (lit?1:dimA) : .8;
+    ctx.strokeStyle = e.kind === 'tklink' ? TKC : SYNC;
+    ctx.globalAlpha = al;
+    ctx.lineWidth = lit ? 2.2 : 1.3;
+    ctx.setLineDash(e.kind === 'tklink' ? [4,3] : []);
+  } else if(e.kind==='synjudge' || e.kind==='synsyn'){
+
+    const sv = synJudgeInfo(e);
+    al = focusNow ? (lit?1:dimA) : .7;
+    ctx.strokeStyle = ink(sv ? (sv.ok ? EDGE_OK : EDGE_BAD) : ECOL);
+    ctx.globalAlpha = al;
+    ctx.lineWidth = lit ? 2.4 : e.kind === 'synsyn' ? 1.6 : 1.3;
+    ctx.setLineDash([]);
+  } else if(e.kind==='rcup'){
+
+    al = focusNow ? (lit?1:dimA) : .45;
+    ctx.strokeStyle = N[e.b].cause ? RCC : RC_NONE;
+    ctx.globalAlpha = al;
+    ctx.lineWidth = lit ? 2.2 : 1;
+    ctx.setLineDash([]);
+  } else if(e.kind==='wolink'){
+
+    const w = TK[N[e.b].tk].wo[N[e.b].w];
+    al = focusNow ? (lit?1:dimA) : .75;
+    ctx.strokeStyle = woCanceled(w) ? WO_NONE : WOC;
+    ctx.globalAlpha = al;
+    ctx.lineWidth = lit ? 2.2 : 1.2;
+    ctx.setLineDash([2,3]);
+  } else if(e.kind==='held'){
+
+    al = focusNow ? (lit?1:dimA) : .75;
+    ctx.strokeStyle = ink(HELD_C);
+    ctx.globalAlpha = al;
+    ctx.lineWidth = lit ? 2 : 1.3;
+    ctx.setLineDash([6,4]);
+  } else if(e.kind==='topo'){
+    al = focusNow ? (lit?1:dimA) : .7;
+
+    ctx.strokeStyle = ink('#d29922');
+    ctx.globalAlpha = al;
+    ctx.lineWidth = onLight() ? 2 : 1.6; ctx.setLineDash([]);
+  } else if(e.kind==='nelink' || e.kind==='nex2'){
+
+    al = focusNow ? (lit?1:dimA) : .75;
+    ctx.strokeStyle = ink(e.kind === 'nex2' ? NE_COL.R : '#d29922');
+    ctx.globalAlpha = al;
+    ctx.lineWidth = lit ? 2.2 : 1.3;
+    ctx.setLineDash(e.kind === 'nex2' ? [5,3] : []);
+  } else if(e.kind==='nepost' || e.kind==='necell'){
+
+    al = focusNow ? (lit?1:dimA) : .6;
+    ctx.strokeStyle = ink(NE_POST_C);
+    ctx.globalAlpha = al;
+    ctx.lineWidth = lit ? 1.8 : 1; ctx.setLineDash([]);
+  } else {
+    al = focusNow ? (lit?1:dimA) : .8;
+    ctx.strokeStyle = ink(SPOKE);
+    ctx.globalAlpha = al * (onLight() ? .75 : 1);
+    ctx.lineWidth=1.2; ctx.setLineDash(e.home ? [1,3.5] : [3,2.5]);
+    if(e.home) ctx.globalAlpha *= .7;
+  }
+
+  if(onLight() && e.kind !== 'spoke' && e.kind !== 'tklink' && e.kind !== 'anc' && e.kind !== 'nepost' &&
+     e.kind !== 'necell' && !dense){
+    const col = ctx.strokeStyle, w = ctx.lineWidth, a0 = ctx.globalAlpha;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = w + 2.4; ctx.globalAlpha = a0*.85;
+    ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke();
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.globalAlpha = a0;
+  }
+  ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke();
+  if(e.kind==='bundle'){
+
+    const ta = G.alarms[N[e.a].ref].t, tb = G.alarms[N[e.b].ref].t;
+    const col = ink(bundleColor(ks));
+    if(ta !== tb) arrowAt(ta < tb ? p : q, ta < tb ? q : p, lit ? 6 : 4.5, col, al);
+    if(lit){
+      const mx = (p.x + q.x)/2, my = (p.y + q.y)/2;
+      ctx.font = 'bold 10px ui-monospace,monospace'; ctx.textAlign = 'left';
+      ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.globalAlpha = al;
+      ctx.strokeStyle = onLight() ? '#ffffffe6' : '#0d1117d9';
+      ctx.strokeText(ks.length, mx + 6, my - 5);
+      ctx.fillStyle = onLight() ? '#1f2328' : '#e6edf3';
+      ctx.fillText(ks.length, mx + 6, my - 5);
+    }
+  }
+  if(e.kind==='corr' && (!dense || lit)){
+    const ta = G.alarms[N[e.a].ref].t, tb = G.alarms[N[e.b].ref].t;
+    if(ta !== tb){
+      const first = ta < tb ? p : q, then = ta < tb ? q : p;
+
+      arrowAt(first, then, lit ? 5.5 : 4.2, ink(edgeColor(e.ref)), al);
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+function drawSiteNodes(){
+  ctx.setLineDash([]);
+  for(let i=0;i<N.length;i++){
+    const n = N[i];
+    if(n.type!=='site') continue;
+    const p = scr(n);
+    ctx.globalAlpha = ((!focusNow || litN.has(i)) ? 1 : .22) *
+                      (siteQuiet(n.ref) ? .3 : 1);
+    const r = siteR(G.sites[n.ref].a);
+    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(Math.PI/4);
+
+    if(transitSet.has(n.ref) || curVia.has(n.ref)){
+
+      const other = curVia.has(n.ref) && G.sites[n.ref].a > 0;
+      ctx.strokeStyle = other ? '#d29922' : '#6e7681'; ctx.lineWidth = other ? 1.6 : 1.2;
+      ctx.setLineDash([2,2]);
+      ctx.strokeRect(-r,-r,r*2,r*2); ctx.setLineDash([]);
+    } else {
+
+      ctx.fillStyle = mapOn ? '#57606a' : '#8b949e'; ctx.fillRect(-r,-r,r*2,r*2);
+      ctx.strokeStyle = mapOn ? '#ffffff' : '#c9d1d9'; ctx.lineWidth=1.4;
+      ctx.strokeRect(-r,-r,r*2,r*2);
+    }
+
+    if(tkSites.has(n.ref)){
+      ctx.strokeStyle = '#bc8cff'; ctx.lineWidth = 2;
+      ctx.strokeRect(-r-3.5, -r-3.5, r*2+7, r*2+7);
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawNeNodes(){
+  ctx.setLineDash([]);
+  const bg = onLight() ? '#ffffff' : '#0d1117';
+  for(let i=0;i<N.length;i++){
+    const n = N[i];
+    if(n.type !== 'ne') continue;
+    const p = scr(n), lit = focusNow && litN.has(i), r = neR(n) + (lit ? 1.5 : 0), col = NE_COL[n.fl];
+    ctx.globalAlpha = (!focusNow || litN.has(i)) ? 1 : .22;
+    ctx.beginPath();
+    if(n.fl === 'T') ctx.rect(p.x-r, p.y-r, 2*r, 2*r);
+    else if(n.fl === 'R'){
+      ctx.moveTo(p.x, p.y-r*1.25); ctx.lineTo(p.x+r, p.y+r*.8); ctx.lineTo(p.x-r, p.y+r*.8); ctx.closePath();
+    } else ctx.arc(p.x, p.y, r, 0, 6.2832);
+    if(n.hot){ ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = bg; ctx.lineWidth = 1; ctx.stroke(); }
+    else { ctx.fillStyle = bg; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1.4; ctx.stroke(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawTowers(){
+  if(!view3d) return;
+  const cols = new Map();
+  for(const n of N){
+    if(n.type !== 'ne') continue;
+    const s = N[n.sn];
+    if(!s) continue;
+    const t = cols.get(n.sn) || {w: 0, top: 0};
+    t.w = Math.max(t.w, Math.abs(n.x - s.x), Math.abs(n.y - s.y));
+    t.top = Math.max(t.top, zOf(n));
+    cols.set(n.sn, t);
+  }
+  ctx.save();
+  ctx.setLineDash([]); ctx.lineWidth = 1;
+  for(const [sn, t] of cols){
+
+    const s = N[sn], w = Math.min(t.w, 45) + 10, z1 = t.top + 10, lit = !focusNow || litN.has(sn);
+    const sq = [[-w,-w],[w,-w],[w,w],[-w,w]];
+    const c0 = sq.map(([dx, dy]) => scrXYZ(s.x+dx, s.y+dy, 0));
+    const c1 = sq.map(([dx, dy]) => scrXYZ(s.x+dx, s.y+dy, z1));
+    ctx.globalAlpha = lit ? .05 : .015; ctx.fillStyle = TOWER_C;
+    for(let i=0;i<4;i++){
+      const j = (i+1)%4;
+      ctx.beginPath();
+      ctx.moveTo(c0[i].x, c0[i].y); ctx.lineTo(c0[j].x, c0[j].y);
+      ctx.lineTo(c1[j].x, c1[j].y); ctx.lineTo(c1[i].x, c1[i].y); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = lit ? .5 : .12; ctx.strokeStyle = TOWER_C;
+    ctx.beginPath();
+    for(const c of [c0, c1]){
+      ctx.moveTo(c[0].x, c[0].y);
+      for(let i=1;i<4;i++) ctx.lineTo(c[i].x, c[i].y);
+      ctx.closePath();
+    }
+    for(let i=0;i<4;i++){ ctx.moveTo(c0[i].x, c0[i].y); ctx.lineTo(c1[i].x, c1[i].y); }
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+function drawNeLabels(){
+  const ne = [];
+  for(let i=0;i<N.length;i++) if(N[i].type === 'ne') ne.push(i);
+  if(!ne.length) return;
+  const few = ne.filter(i => N[i].fl !== 'C').length <= 14;
+  ctx.save();
+  ctx.font = '9.5px ui-monospace,monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.setLineDash([]); ctx.globalAlpha = 1;
+  for(const i of ne){
+    const n = N[i];
+    if(focusNow ? !litN.has(i) : (!few || n.fl === 'C')) continue;
+    const p = scr(n), txt = G.strings[NES[n.ref].n], x = p.x + neR(n) + 4;
+    ctx.strokeStyle = onLight() ? '#ffffffe6' : '#0d1117d9'; ctx.strokeText(txt, x, p.y);
+    ctx.fillStyle = onLight() ? '#1f2328' : NE_COL[n.fl]; ctx.fillText(txt, x, p.y);
+  }
+  ctx.restore();
+}
+
+function drawAlarmNodes(){
+  ctx.setLineDash([]);
+  for(let i=0;i<N.length;i++){
+    const n = N[i];
+    if(n.type!=='alarm' || !alarmShown(n.ref)) continue;
+    const p = scr(n), lit = focusNow && litN.has(i);
+    ctx.globalAlpha = (!focusNow || litN.has(i)) ? 1 : .22;
+    const a = G.alarms[n.ref];
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, lit ? alarmR(a.o)+1.5 : alarmR(a.o), 0, 6.2832);
+
+    const isSyn = alarmSyn(a);
+    ctx.fillStyle = isSyn ? SYNC : alarmInk(a.c); ctx.fill();
+
+    if(onLight()){ ctx.strokeStyle='#fff'; ctx.lineWidth = 1.6; ctx.stroke(); }
+    else if(mapOn){ ctx.strokeStyle='#0d1117'; ctx.lineWidth=1; ctx.stroke(); }
+    if(isSyn){
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, alarmR(a.o) + (lit ? 5 : 3.5), 0, 6.2832);
+      ctx.strokeStyle = SYNC; ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    if(a.hk && (a.hk.rt || a.hk.rx)){
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, alarmR(a.o) + (lit ? 7 : 5.5), 0, 6.2832);
+      ctx.setLineDash(a.hk.rt ? [] : [3, 3]);
+      ctx.strokeStyle = ROOT_C; ctx.lineWidth = a.hk.rt ? 2.5 : 2; ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if(playNowT != null && a.t === playNowT){
+      const ph = playOn ? (performance.now()/700) % 1 : .3;
+      ctx.globalAlpha = 1 - ph;
+      ctx.strokeStyle = alarmInk(a.c); ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, alarmR(a.o) + 3 + ph*11, 0, 6.2832);
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha=1;
+}
+
+const TK_R = 4.5, SYN_R = 5;
+function drawTicketNodes(){
+  ctx.setLineDash([]);
+  const light = onLight();
+  for(let i=0;i<N.length;i++){
+    const n = N[i];
+    if(n.type !== 'ticket' && n.type !== 'syn' && n.type !== 'rc' && n.type !== 'wo') continue;
+    if(!nodeShown(n)) continue;
+    const p = scr(n), lit = focusNow && litN.has(i);
+    ctx.globalAlpha = (!focusNow || litN.has(i)) ? 1 : .22;
+    ctx.lineWidth = 1.3;
+    ctx.strokeStyle = light ? '#fff' : '#0d1117';
+    if(n.type === 'wo'){
+
+      const r = WO_R + (lit ? 1.5 : 0), cx_ = woCanceled(TK[n.tk].wo[n.w]);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y - r*1.25); ctx.lineTo(p.x + r, p.y);
+      ctx.lineTo(p.x, p.y + r*1.25); ctx.lineTo(p.x - r, p.y); ctx.closePath();
+      if(cx_){
+        ctx.fillStyle = light ? '#fff' : '#0d1117'; ctx.fill();
+        ctx.strokeStyle = WO_NONE; ctx.lineWidth = 2; ctx.stroke();
+      } else { ctx.fillStyle = WOC; ctx.fill(); ctx.stroke(); }
+      if(playNowT != null && shownAt(n) === playNowT){
+        const ph = playOn ? (performance.now()/700) % 1 : .3;
+        ctx.globalAlpha = 1 - ph; ctx.strokeStyle = WOC; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, WO_R + 4 + ph*11, 0, 6.2832); ctx.stroke();
+      }
+      continue;
+    }
+    if(n.type === 'rc'){
+
+      const r = rcR(n) + (lit ? 1.5 : 0), col = n.cause ? RCC : RC_NONE;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      for(let s = 0; s < 6; s++){
+        const a_ = Math.PI/6 + s*Math.PI/3;
+        ctx[s ? 'lineTo' : 'moveTo'](p.x + r*Math.cos(a_), p.y + r*Math.sin(a_));
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      continue;
+    }
+    if(n.type === 'ticket'){
+      const r = TK_R + (lit ? 1.5 : 0);
+      if(tkPartial(n)){
+
+        ctx.fillStyle = light ? '#fff' : '#0d1117';
+        ctx.fillRect(p.x-r, p.y-r, r*2, r*2);
+        ctx.strokeStyle = TKC; ctx.lineWidth = 2;
+        ctx.strokeRect(p.x-r, p.y-r, r*2, r*2);
+        ctx.lineWidth = 1.3; ctx.strokeStyle = light ? '#fff' : '#0d1117';
+      } else {
+        ctx.fillStyle = TKC;
+        ctx.fillRect(p.x-r, p.y-r, r*2, r*2);
+        ctx.strokeRect(p.x-r, p.y-r, r*2, r*2);
+      }
+    } else {
+      const r = SYN_R + (lit ? 1.5 : 0);
+      ctx.fillStyle = SYNC;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 6.2832);
+      ctx.fill(); ctx.stroke();
+    }
+
+    if(playNowT != null && shownAt(n) === playNowT){
+      const ph = playOn ? (performance.now()/700) % 1 : .3;
+      ctx.globalAlpha = 1 - ph;
+      ctx.strokeStyle = n.type === 'ticket' ? TKC : SYNC; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (n.type === 'ticket' ? TK_R : SYN_R) + 4 + ph*11, 0, 6.2832);
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+const NOW_LABEL_MAX = 24;
+
+const CAT_WORDS = {MAINPOWER: 'Main power', OTHER: 'Other'};
+function catLabel(c){
+  if(CAT_WORDS[c]) return CAT_WORDS[c];
+  if(!/_/.test(c)) return c;
+  const s = c.toLowerCase().replace(/_/g, ' ');
+  return s[0].toUpperCase() + s.slice(1);
+}
+function drawNowLabels(){
+  if(playNowT == null || curIdx < 0) return;
+  const light = onLight(), H = 16, placed = [];
+  ctx.font = '10.5px ui-monospace,monospace'; ctx.textAlign = 'left';
+  ctx.setLineDash([]);
+  let n = 0;
+  const said = new Set();
+  for(const nd of N){
+
+    const isTk = nd.type === 'ticket' && shownAt(nd) === playNowT;
+    const isSy = nd.type === 'syn' && shownAt(nd) === playNowT;
+    if(nd.type === 'wo'){
+      if(shownAt(nd) !== playNowT || n >= NOW_LABEL_MAX) continue;
+      n++;
+      const p = scr(nd), txt = String(TK[nd.tk].wo[nd.w].id);
+      ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = light ? '#ffffffe6' : '#0d1117d9';
+      ctx.strokeText(txt, p.x + WO_R + 6, p.y + 4);
+      ctx.fillStyle = WOC; ctx.fillText(txt, p.x + WO_R + 6, p.y + 4);
+      continue;
+    }
+    if(!isTk && !isSy && (nd.type !== 'alarm' || G.alarms[nd.ref].t !== playNowT)) continue;
+
+    const a = isTk ? {s: 'tk' + nd.ref, c: 'tk'} : isSy ? {s: 'syn' + N.indexOf(nd), c: 'syn'}
+            : G.alarms[nd.ref], key = a.s + ':' + a.c;
+    if(said.has(key)) continue;
+    said.add(key);
+    if(n++ >= NOW_LABEL_MAX) break;
+    const p = scr(nd), r = isTk ? TK_R : isSy ? SYN_R : alarmR(a.o);
+
+    const txt = isTk ? String(TK[nd.ref].id) : isSy ? String(nd.ref) : catLabel(G.strings[a.c]);
+    const edge = isTk ? TKC : isSy ? SYNC : alarmInk(a.c);
+    const w = ctx.measureText(txt).width + 12;
+
+    const side = $('detail').getBoundingClientRect(), cvr = cv.getBoundingClientRect();
+    const edgeX = (side.width > 0 && side.left > cvr.left
+                   ? Math.min(cv.clientWidth, side.left - cvr.left) : cv.clientWidth) - 6;
+    let x = p.x + r + 6 + w > edgeX ? p.x - r - 6 - w : p.x + r + 6, y = p.y - H/2;
+    for(let tries = 0; tries < 12 &&
+        placed.some(b => x < b.x + b.w && x + w > b.x && y < b.y + H && y + H > b.y);
+        tries++) y += H + 2;
+    placed.push({x, y, w});
+    ctx.globalAlpha = 1;
+    if(Math.abs(y + H/2 - p.y) > 2){
+      const right = x > p.x;
+      ctx.strokeStyle = edge; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(p.x + (right ? r : -r), p.y);
+      ctx.lineTo(right ? x : x + w, y + H/2); ctx.stroke();
+    }
+    ctx.fillStyle = light ? '#ffffffeb' : '#0d1117e6';
+    ctx.strokeStyle = edge; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x, y, w, H, 4) : ctx.rect(x, y, w, H);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = light ? '#1f2328' : '#e6edf3';
+    ctx.fillText(txt, x + 6, y + H - 4.5);
+  }
+}
+
+function drawSiteLabels(){
+  ctx.font='10px ui-monospace,monospace'; ctx.textAlign='center';
+  ctx.fillStyle='#8b949e';
+
+  const halo = mapOn ? (mapBase === 'streets' ? ['#ffffffe6', '#1f2328']
+                                              : ['#0d1117d9', '#e6edf3']) : null;
+  if(halo){ ctx.font = 'bold 10.5px ui-monospace,monospace';
+            ctx.lineWidth = 3; ctx.lineJoin = 'round'; }
+  for(let i=0;i<N.length;i++){
+    if(N[i].type!=='site') continue;
+    if(focusNow && !litN.has(i)) continue;
+    const p = scr(N[i]), s = G.sites[N[i].ref];
+    ctx.globalAlpha = siteQuiet(N[i].ref) ? .35 : 1;
+    if(halo){
+      ctx.strokeStyle = halo[0];
+      ctx.strokeText(siteLabel(s), p.x, p.y - siteR(s.a) - 6);
+      ctx.fillStyle = halo[1];
+    }
+    ctx.fillText(siteLabel(s), p.x, p.y - siteR(s.a) - 6);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function draw(){
+  const W=cv.clientWidth, H=cv.clientHeight;
+
+  if(leafOn() && curIdx >= 0) ctx.clearRect(0,0,W,H);
+  else { ctx.fillStyle='#0d1117'; ctx.fillRect(0,0,W,H); }
+  if(curIdx<0 || !N.length){
+    hideLeaf();
+
+    if(playOn) playStop(false);
+    playT = null; playNowT = null;
+    $('player').hidden = true;
+    $('nowCard').hidden = true; nowK = null;
+    tkSites = new Set();
+    return;
+  }
+
+  const box = layoutBox();
+  LAYER_H = Math.max(LAYER_MIN,
+                     Math.min(LAYER_MAX, box.span*LAYER_FRACTION));
+  const showSites = $('showSites').checked;
+  litN = new Set(); litE = new Set();
+  focusNow = sel || hover;
+  if(focusNow){
+    if(focusNow.kind==='node'){
+      litN.add(focusNow.i);
+      E.forEach((e,k)=>{ if(e.a===focusNow.i||e.b===focusNow.i){
+        litE.add(k); litN.add(e.a); litN.add(e.b); } });
+    } else {
+      litE.add(focusNow.i);
+      litN.add(E[focusNow.i].a); litN.add(E[focusNow.i].b);
+
+      if(E[focusNow.i].kind === 'bundle')
+        for(const k of E[focusNow.i].ks){ litE.add(k); litN.add(E[k].a); litN.add(E[k].b); }
+    }
+
+    for(const i of [...litN]) if(N[i].sn != null) litN.add(N[i].sn);
+  }
+  dimA = focusNow ? .07 : 1;
+
+  platesNow = null; wallNow = null;
+  if(mapOn) drawGround(box);
+  else if(view3d && showSites) drawPlates(box);
+  if(showSites){
+    if(LIFT > 0) drawTowers();
+    for(let k=0;k<E.length;k++) if(E[k].kind==='topo')  drawEdge(k);
+
+    for(let k=0;k<E.length;k++) if(E[k].kind==='nepost' || E[k].kind==='necell') drawEdge(k);
+    for(let k=0;k<E.length;k++) if(E[k].kind==='nelink' || E[k].kind==='nex2') drawEdge(k);
+    for(let k=0;k<E.length;k++) if(E[k].kind==='spoke' || E[k].kind==='anc') drawEdge(k);
+    drawSiteNodes();
+    drawNeNodes();
+  }
+  for(let k=0;k<E.length;k++) if(E[k].kind==='bundle') drawEdge(k);
+  for(let k=0;k<E.length;k++) if(E[k].kind==='corr') drawEdge(k);
+  for(let k=0;k<E.length;k++) if(E[k].kind==='synjudge') drawEdge(k);
+  drawAlarmNodes();
+
+  for(let k=0;k<E.length;k++) if(E[k].kind==='tklink') drawEdge(k);
+  for(let k=0;k<E.length;k++) if(E[k].kind==='synlink') drawEdge(k);
+  for(let k=0;k<E.length;k++) if(E[k].kind==='synsyn') drawEdge(k);
+  for(let k=0;k<E.length;k++) if(E[k].kind==='rcup') drawEdge(k);
+  for(let k=0;k<E.length;k++) if(E[k].kind==='wolink') drawEdge(k);
+  drawTicketNodes();
+  ctx.setLineDash([]); ctx.globalAlpha=1;
+  drawPlateLabels();
+  drawWallLabel();
+  if(showSites){ drawSiteLabels(); drawNeLabels(); }
+  drawNowLabels();
+  ctx.globalAlpha=1;
+}
+
+function segDist(mx,my,x1,y1,x2,y2){
+  const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy;
+  if(!L2) return Math.hypot(mx-x1,my-y1);
+  let t=((mx-x1)*dx+(my-y1)*dy)/L2; t=Math.max(0,Math.min(1,t));
+  return Math.hypot(mx-(x1+t*dx), my-(y1+t*dy));
+}
+function pick(mx,my){
+  const showSites = $('showSites').checked;
+  for(let i=N.length-1;i>=0;i--){
+    const n=N[i];
+    if((n.type==='site' || n.type==='ne') && !showSites) continue;
+    if(!nodeShown(n)) continue;
+    const p=scr(n);
+    const r = (n.type==='site' ? siteR(G.sites[n.ref].a) : n.type==='ne' ? neR(n)
+             : n.type==='ticket' ? TK_R : n.type==='syn' ? SYN_R : n.type==='rc' ? rcR(n)
+             : n.type==='wo' ? WO_R
+             : alarmR(G.alarms[n.ref].o)) + 4;
+    if((p.x-mx)**2+(p.y-my)**2 < r*r) return {kind:'node', i};
+  }
+  let best=null, bd=6;
+  for(let k=0;k<E.length;k++){
+    const e=E[k];
+    if((e.kind==='topo'||e.kind==='spoke'||NE_EDGE.has(e.kind)) && !showSites) continue;
+    if(!edgeShown(e) || corrHidden(e, k)) continue;
+    if(e.kind === 'bundle' && !bundleShown(e).length) continue;
+    const p=scr(N[e.a]), q=scr(N[e.b]);
+    const d=segDist(mx,my,p.x,p.y,q.x,q.y);
+    if(d<bd){ bd=d; best={kind:'edge', i:k}; }
+  }
+  return best;
+}
+
+function worldOf(mx, my, z){
+  const cw = view3d ? Math.cos(yaw)  : 1, sw = view3d ? Math.sin(yaw)  : 0;
+  const ce = view3d ? Math.cos(elev) : 0, se = view3d ? Math.sin(elev) : 1;
+  const rx = (mx - cv.clientWidth/2)/cam.k;
+  const ry = ((my - cv.clientHeight/2)/cam.k + z*ce)/se;
+  return {x: cam.x + rx*cw + ry*sw, y: cam.y - rx*sw + ry*cw};
+}
+
+function dur(s){
+  s = Math.round(Math.abs(s));
+  if(s < 60) return s+' s';
+  if(s < 3600) return Math.floor(s/60)+'m '+(s%60)+'s';
+  if(s < 86400) return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m';
+  return Math.floor(s/86400)+'d '+Math.floor((s%86400)/3600)+'h';
+}
+
+function clearLine(a){
+  if(a.ct == null) return '<br><span style="opacity:.55">clear: unknown</span>';
+  return '<br>clear ' + iso(a.ct) + ' '+TZL+' <span style="opacity:.7">(open '
+    + dur(a.ct - a.t) + ')</span>';
+}
+function alarmLine(i){
+  const a=G.alarms[i];
+  return '<div style="margin:5px 0"><div><span class="chip" style="background:'+
+    catColor(a.c)+'">'+G.strings[a.c]+'</span> <b style="color:#fff">'+
+    G.sites[a.s].n+'</b>'+
+    (a.dr ? ' <span class="find">'+G.strings[a.dr]+'</span>' : '')+
+    '</div><div class="hint" style="padding-left:2px">'+
+    G.strings[a.n]+(a.o>1?' '+DEG+' fired '+a.o+'x':'')+deviceLine(a)+'<br>'+iso(a.t)+' '+TZL+
+    clearLine(a)+
+    (a.tg ? '<br><span style="color:#bc8cff">'+(a.ta
+      ? 'attached on the topology path (pure_view --topo-attach): fired as this incident went down, at a site on '+
+        'the path between its sites; the model linked it elsewhere or to nothing'
+      : a.tm
+      ? 'moved here by its ticket (pure_view --ticket-home): the model put it in another incident'
+      : 'held here by its ticket: the model linked it to nothing')+'</span>' : '')+
+    (a.l ? '<br>label: '+Object.entries(a.l).map(
+        ([k,v])=>k+'='+G.strings[v]).join(', ') : '')+hkLine(a)+'</div></div>';
+}
+
+function hkLine(a){
+  const h = a.hk;
+  if(!h) return '';
+  return '<br><span style="color:'+ROOT_C+'">'+
+    (h.rt ? '<b>ROOT CAUSE (Hawkes)</b> ' : h.rx ? '<b>root by h x-fam</b> ' : 'Hawkes: ')+
+    'own '+pctS(h.o)+', sets off '+h.d.toFixed(1)+
+    (h.p != null ? '; set off by '+G.strings[h.p]+' ('+pctS(h.pr)+')' : '; no parent in reach')+'</span>';
+}
+
+function rootRowOf(c){
+  if(!M.hawkes) return '';
+  const ev = c.al.filter(i => G.alarms[i].hk).sort((x, y) => G.alarms[y].hk.sc - G.alarms[x].hk.sc);
+  if(!ev.length) return row('root (Hawkes)', '<span style="opacity:.55">not scored (not a test day, or left '+
+                                                'out of the transactions)</span>');
+  const one = i => { const a = G.alarms[i], h = a.hk;
+    return '<span class="chip" style="background:'+catColor(a.c)+'">'+G.strings[a.c]+'</span> '+G.sites[a.s].n+
+      ' <span style="opacity:.6">own '+pctS(h.o)+', sets off '+h.d.toFixed(1)+'</span>'; };
+  const rt = ev.filter(i => G.alarms[i].hk.rt), rx = ev.filter(i => G.alarms[i].hk.rx && !G.alarms[i].hk.rt);
+  return row('<span style="color:'+ROOT_C+'">root (Hawkes)</span>', rt.map(one).join('<br>') || '-') +
+    (rx.length ? row('<span style="color:'+ROOT_C+'">root, h x-fam</span>', rx.map(one).join('<br>')) : '') +
+    row('<span style="opacity:.7">next by score</span>', ev.filter(i => !G.alarms[i].hk.rt).slice(0, 3).map(one)
+          .join('<br>') || '-');
+}
+
+function spreadRowOf(c){
+  const cts = c.al.map(i => G.alarms[i].ct).filter(t => t != null);
+  if(cts.length < 2)
+    return c.al.length >= 2
+      ? row('Max Clear Spread', '<span style="opacity:.55">too few known</span>')
+      : '';
+  const spread = cts.reduce((a,b)=>Math.max(a,b), -Infinity)
+               - cts.reduce((a,b)=>Math.min(a,b), Infinity);
+
+  const capC = M.max_cluster_spread_sec, negC = M.coclear_neg_sec || 3600;
+  const col = (capC != null && spread<=capC) ? '#4ade80'
+            : (spread<=negC ? '#fbbf24' : '#f87171');
+  const part = cts.length < c.al.length
+    ? ' <span style="opacity:.55">('+cts.length+'/'+c.al.length+')</span>' : '';
+  return row('Max Clear Spread',
+    '<span style="color:'+col+'">'+dur(spread)+'</span>'+part);
+}
+
+function blastRowOf(c){
+  const b = blastOf(c);
+  if(b.epi === undefined || b.nGeo < 2)
+    return row('Blast radius', '<span style="opacity:.55">'+(b.epi === undefined ? 'no site has coordinates'
+                                                                           : 'one site has coordinates')+'</span>');
+  return row('Blast radius', b.radius.toFixed(1)+' km radius');
+}
+
+function clearGapRow(m){
+  const tol = tolOf(m), neg = negOf(m);
+  if(m.dc == null)
+    return row('cleared apart', '<span style="opacity:.55">unknown</span>');
+
+  if(synPairOk(m) != null){
+    const ok = synPairOk(m);
+    return row('cleared apart', '<span style="color:'+(ok ? '#4ade80' : '#f87171')+'">'+dur(m.dc)+
+      (ok ? ' together' : ' apart')+'</span>')+
+      row('judged by', '&#8804;'+durT(m.st)+' <span style="opacity:.55">a synthetic alarm at one end: '+
+        'coloured, not counted in any score</span>');
+  }
+  if(m.nj)
+    return row('cleared apart', dur(m.dc)+' <span style="opacity:.55">not judged: '+
+      (NJ_WHY[m.nj] || 'no yardstick')+'</span>');
+  if(tol == null || neg == null) return row('cleared apart', dur(m.dc));
+  const mark = m.dc<=tol ? ' together' : (m.dc>neg ? ' apart' : ' undecided');
+  const col  = m.dc<=tol ? '#4ade80'   : (m.dc>neg ? '#f87171' : '#fbbf24');
+  const ta = G.alarms[m.i].tol, tb = G.alarms[m.j].tol;
+  return row('cleared apart',
+    '<span style="color:'+col+'">'+dur(m.dc)+mark+'</span>')+
+    row('judged by', '&#8804;'+durT(tol)+(m.tol != null && ta != null && tb != null
+      ? ' <span style="opacity:.55">the larger of '+durT(ta)+' and '+durT(tb)+'</span>'
+      : '')+(m.tl ? ' <span style="opacity:.55">&middot; measured by the co-clear lift (no tickets)</span>' : ''));
+}
+
+function transitNote(ref){
+  if(!transitSet.has(ref) && !curVia.has(ref)) return '';
+  if(G.sites[ref].a > 0){
+
+    const gs = new Map();
+    for(const a of G.alarms) if(a.s === ref){
+      const k = a.g != null ? a.g : a.mc;
+      if(k != null) gs.set(k, (gs.get(k) || 0) + 1);
+    }
+    const ls = [...gs].sort((x, y) => y[1] - x[1]).slice(0, 4)
+      .map(([k, n]) => (M.by_incident ? 'incident ' : 'cluster ') + k + ' (' + n + ')').join(', ');
+    return '<div class="hint" style="margin-top:4px">on the path only'+DASH+
+      'its alarms are in another '+(M.by_incident ? 'incident' : 'cluster')+
+      (ls ? ': '+ls : '')+'. Drawn because the topology path between two sites of '+
+      'this one runs through it.</div>';
+  }
+  return '<div class="hint" style="margin-top:4px">transit only'+DASH+
+    'no alarm here. Drawn because the topology path between two alarming '+
+    'sites runs through it.</div>';
+}
+
+function blastOf(c){
+  ensureTopoRoots();
+  const A = G.alarms, lat = G._alat, troot = G._troot;
+  const ord = c.al.slice().sort((x,y) => (A[x].t - A[y].t) || (x - y));
+
+  const rep = new Map();
+  for(const i of ord) if(!rep.has(A[i].s)) rep.set(A[i].s, i);
+  const sIdx = [...rep.values()];
+  const geo = sIdx.filter(i => isFinite(lat[i]));
+
+  const epi = ord.find(i => isFinite(lat[i]));
+  const out = {ord, nSites: sIdx.length, nGeo: geo.length,
+               epiIsFirst: epi === ord[0], epi: epi};
+  if(epi === undefined) return out;
+
+  let reach = 0, far = epi;
+  const dists = [];
+  for(const i of geo){
+    const d = kmA(epi, i);
+    dists.push(d);
+    if(d > reach){ reach = d; far = i; }
+  }
+  let span = 0, spanPair = null, noTopo = 0, noTopoPair = null;
+  for(let a=0;a<geo.length;a++) for(let b=a+1;b<geo.length;b++){
+    const d = kmA(geo[a], geo[b]);
+    if(d > span){ span = d; spanPair = [geo[a], geo[b]]; }
+    if(troot[geo[a]] !== troot[geo[b]] && d > noTopo){
+      noTopo = d; noTopoPair = [geo[a], geo[b]];
+    }
+  }
+
+  const growth = [];
+  let run = -1;
+  for(const i of ord){
+    if(!isFinite(lat[i])) continue;
+    const d = kmA(epi, i);
+    if(d > run){ run = d; growth.push([A[i].t, run]); }
+  }
+  if(growth.length) growth.push([A[ord[ord.length-1]].t, run]);
+
+  const radius = span / 2;
+  return Object.assign(out, {radius, reach, far, span, spanPair, noTopo,
+                             noTopoPair, dists, growth});
+}
+
+function ladderSVG(dists, mx){
+  const W = 318, H = 30, P = 4, span = Math.max(mx, 0.05);
+  const x = d => P + d/span*(W - P*2);
+  let ticks = '';
+  for(const d of dists)
+    ticks += '<line x1="'+x(d).toFixed(1)+'" y1="5" x2="'+x(d).toFixed(1)+
+             '" y2="17" stroke="#58a6ff" stroke-opacity=".5" stroke-width="1.5"/>';
+  return '<svg class="viz" viewBox="0 0 '+W+' '+H+'">'+
+    '<line x1="'+P+'" y1="11" x2="'+(W-P)+'" y2="11" stroke="#21262d" '+
+      'stroke-width="1.5"/>'+ticks+
+    '<circle cx="'+P+'" cy="11" r="3.2" fill="#58a6ff"/>'+
+    '<text x="'+P+'" y="28" fill="#7d8590" font-size="9">epicentre</text>'+
+    '<text x="'+(W-P)+'" y="28" fill="#7d8590" font-size="9" '+
+      'text-anchor="end">'+span.toFixed(1)+' km</text></svg>';
+}
+
+function growthSVG(g, mx){
+  const W = 318, H = 46, P = 4, BASE = H - 12, TOP = 5;
+  const t0 = g[0][0], t1 = g[g.length-1][0], sp = Math.max(1, t1 - t0);
+  const span = Math.max(mx, 0.05);
+  const X = t => P + (t - t0)/sp*(W - P*2);
+  const Y = r => BASE - r/span*(BASE - TOP);
+  let d = 'M'+X(t0).toFixed(1)+' '+Y(g[0][1]).toFixed(1);
+  let py = Y(g[0][1]);
+  for(let k=1;k<g.length;k++){
+    const nx = X(g[k][0]).toFixed(1), ny = Y(g[k][1]);
+    d += 'L'+nx+' '+py.toFixed(1);
+    if(ny !== py){ d += 'L'+nx+' '+ny.toFixed(1); py = ny; }
+  }
+  return '<svg class="viz" viewBox="0 0 '+W+' '+H+'">'+
+    '<path d="'+d+'L'+X(t1).toFixed(1)+' '+BASE+'L'+X(t0).toFixed(1)+' '+BASE+
+      'Z" fill="#58a6ff" fill-opacity=".13"/>'+
+    '<path d="'+d+'" fill="none" stroke="#58a6ff" stroke-width="1.6"/>'+
+    '<line x1="'+P+'" y1="'+BASE+'" x2="'+(W-P)+'" y2="'+BASE+
+      '" stroke="#21262d" stroke-width="1"/>'+
+    '<text x="'+P+'" y="'+(H-2)+'" fill="#7d8590" font-size="9">T+0</text>'+
+    '<text x="'+(W-P)+'" y="'+(H-2)+'" fill="#7d8590" font-size="9" '+
+      'text-anchor="end">'+dur(t1-t0)+'</text></svg>';
+}
+function blastBlock(c){
+  const b = blastOf(c);
+  if(b.epi === undefined)
+    return '<h2>Blast radius</h2><div class="hint">no site in this cluster '+
+      'carries coordinates, so nothing here can be measured.</div>';
+  if(b.nGeo < 2)
+    return '<h2>Blast radius</h2><div class="hint">only one site here has '+
+      'coordinates ('+b.nGeo+' of '+b.nSites+'), so there is no distance to '+
+      'report.</div>';
+  const cap = M.max_cluster_no_topo_km;
+  const ntCol = cap == null ? 'var(--dim)'
+              : (b.noTopo > cap ? '#f87171' : '#4ade80');
+  const nm = i => esc(G.sites[G.alarms[i].s].n);
+  let h = '<h2>Blast radius</h2>'+
+    '<div class="br"><span class="br-big">'+b.radius.toFixed(1)+
+      '</span><span class="br-u">km radius</span></div>'+
+    '<div class="cap">half the widest pair'+(b.spanPair
+      ? ' '+DEG+' '+nm(b.spanPair[0])+ARR+nm(b.spanPair[1]) : '')+'</div>'+
+
+    row('widest pair', b.span.toFixed(1)+' km'+(b.spanPair
+      ? ' <span style="opacity:.5">'+nm(b.spanPair[0])+ARR+
+        nm(b.spanPair[1])+'</span>' : ''))+
+    row('no topology', b.noTopoPair
+      ? '<span style="color:'+ntCol+'">'+b.noTopo.toFixed(1)+' km</span>'+
+        (cap != null ? ' <span style="opacity:.5">cap '+cap+'</span>' : '')
+      : '<span style="opacity:.55">every pair related</span>');
+  return h;
+}
+
+const TL_BURSTS = 25;
+let tlAll = false;
+
+const ACRO = new Set(['NE','UMTS','GSM','LTE','NR','BTS','BN','EMS','OLT','ONU',
+  'ONT','PON','IP','BFD','OSPF','BGP','LOS','LOF','RX','TX','DDM','CPU','AC',
+  'DC','SFP','VSWR','RRU','BBU','RF','GPS','SDH','MW','NMS','FTTH','ETPI',
+  'ETH','LAN','WAN','VPN','MPLS','LSP','PW','CE','PE','OMC','X2','S1']);
+const CASED = {NODEB:'NodeB', ENODEB:'eNodeB', GNODEB:'gNodeB',
+               UTRANCELL:'UtranCell', EUTRANCELL:'EUtranCell'};
+const nameCache = new Map();
+function shortName(full){
+  if(nameCache.has(full)) return nameCache.get(full);
+  const m = /^([A-Z0-9]+)-([A-Z0-9]+)-(.+)$/i.exec(full);
+  let rest = (m ? m[3] : full)
+    .replace(/MORETHAN(\d+)PER(CENT)?/gi, '_>$1%')
+    .replace(/LESSTHAN(\d+)PER(CENT)?/gi, '_<$1%')
+    .replace(/(CELL|SITE|LINK|PORT)DOWN/gi, '$1_DOWN')
+    .replace(/SERVICEUNAVAIL/gi, 'SERVICE_UNAVAIL');
+  let s = rest.split(/[_\s]+/).filter(Boolean).map(w => {
+    const u = w.toUpperCase();
+    if(CASED[u]) return CASED[u];
+    if(ACRO.has(u) || /\d|[()%<>]/.test(w)) return w;
+    return w.toLowerCase();
+  }).join(' ');
+  s = s.charAt(0).toUpperCase() + s.slice(1);
+
+  const v = !m ? '' : m[1].length <= 3 ? m[1].toUpperCase()
+                    : m[1].charAt(0) + m[1].slice(1).toLowerCase();
+  const out = {name: s, vendor: v};
+  nameCache.set(full, out);
+  return out;
+}
+
+const catShort = c => G.strings[c].replace(/_DOWN$/, '')
+                                  .replace(/^MAINPOWER$/, 'POWER');
+function ticketOf(a){
+  if(!a.l) return '';
+  const keys = Object.keys(a.l);
+  const k = keys.find(x => /ticket|inc/i.test(x)) || keys[0];
+  return k ? G.strings[a.l[k]] : '';
+}
+function seqBlock(c){
+  const A = G.alarms;
+  const ord = c.al.slice().sort((x,y) => (A[x].t - A[y].t) || (x - y));
+
+  const byT = new Map();
+  const at = t => { if(!byT.has(t)) byT.set(t, {t, al: [], tk: []}); return byT.get(t); };
+  for(const i of ord) at(A[i].t).al.push(i);
+  for(const x of ticketsOf(c)) at(TK[x.k].t).tk.push(x);
+  const bursts = [...byT.values()].sort((x, y) => x.t - y.t);
+  const t0 = bursts[0].t, tN = bursts[bursts.length-1].t;
+  const firstAl = bursts.find(b => b.al.length);
+  const nTk = ticketsOf(c).length;
+  const shown = tlAll ? bursts : bursts.slice(0, TL_BURSTS);
+  let h = '<h2>Sequence</h2>'+
+    '<div class="cap">'+fmt(bursts.length)+' moment'+
+      (bursts.length===1?'':'s')+' over '+dur(tN-t0)+' '+DEG+' first at '+
+      iso(t0)+' '+TZL+'</div><div class="tl">';
+  let prev = null;
+  for(const b of shown){
+
+    if(prev !== null && b.t - prev >= 60)
+      h += '<div class="tl-gap" data-t="'+b.t+'">'+dur(b.t - prev)+
+        ' later</div>';
+    h += '<div class="tl-b'+(b===firstAl?' first':'')+'" data-t="'+b.t+'">'+
+      '<div class="tl-t"><b>T+'+(b.t===t0 ? '0s' : dur(b.t-t0))+'</b>'+
+      '<span>'+iso(b.t).slice(11)+'</span>'+
+      (b===firstAl ? '<span class="tl-tag">first alarm</span>' : '')+
+      (b.al.length>1 ? '<span>'+DEG+' '+b.al.length+' together</span>' : '')+
+      (!b.al.length ? '<span class="tl-tag" style="color:var(--find)">ticket</span>' : '')+
+      '</div>';
+    for(const i of b.al){
+      const a = A[i], tk = ticketOf(a), n = G.strings[a.n];
+      h += '<div class="tl-e" data-a="'+i+'" title="'+esc(n)+' @ '+
+        esc(G.sites[a.s].n)+'">'+
+        '<span class="tl-c" style="background:'+catColor(a.c)+'">'+
+          esc(catShort(a.c))+'</span>'+
+        '<span class="tl-s">'+esc(G.sites[a.s].n)+'</span>'+
+        '<span class="tl-n">'+esc(shortName(n).name)+
+          (a.o>1 ? ' '+DEG+' '+a.o+'x' : '')+
+        '</span>'+(tk ? '<span class="tl-tk">'+esc(tk)+'</span>' : '')+
+        '</div>';
+    }
+    for(const x of b.tk){
+      const k = TK[x.k];
+      h += '<div class="tl-e tke" data-k="'+x.k+'" title="ticket '+esc(k.id)+' @ '+
+        esc(G.sites[k.s].n)+(k.syn ? ' '+DEG+' '+esc(k.syn) : '')+'">'+
+        '<span class="tl-c" style="background:'+TKC+'">TKT</span>'+
+        '<span class="tl-s">'+esc(G.sites[k.s].n)+'</span>'+
+        '<span class="tl-n">'+esc(k.id)+'</span>'+
+        '<span class="tl-tk" title="ticket time minus the nearest alarm at this site">'+
+          sgn(x.d)+'</span></div>';
+    }
+    h += '</div>';
+    prev = b.t;
+  }
+  h += '</div>';
+  if(bursts.length > shown.length)
+    h += '<div class="tl-more" id="tlmore">show all '+fmt(bursts.length)+
+      ' moments '+DEG+' '+fmt(c.al.length)+' alarms'+
+      (nTk ? ' '+DEG+' '+nTk+' ticket'+(nTk === 1 ? '' : 's') : '')+'</div>';
+  else if(tlAll && bursts.length > TL_BURSTS)
+    h += '<div class="tl-more" id="tlmore">collapse to first '+
+      TL_BURSTS+'</div>';
+  return h;
+}
+
+function wireDetail(){
+  for(const el of $('detail').querySelectorAll('.tl-e')){
+    el.onclick = () => {
+
+      const ni = el.dataset.k != null
+        ? N.findIndex(n => n.type === 'ticket' && n.ref === +el.dataset.k)
+        : nodeOfAlarm.get(+el.dataset.a);
+      if(ni == null || ni < 0) return;
+      for(const o of $('detail').querySelectorAll('.tl-e.on'))
+        o.classList.remove('on');
+      el.classList.add('on');
+
+      sel = {kind:'node', i:ni};
+      if(!raf) draw();
+    };
+  }
+  const more = $('tlmore');
+  if(more) more.onclick = () => { tlAll = !tlAll; showCluster(); };
+  const back = $('tlback');
+  if(back) back.onclick = () => { sel = null; showCluster(); if(!raf) draw(); };
+  seqK = null; syncSeq(false);
+}
+
+const backLink = () =>
+  '<div class="tl-more" id="tlback" style="margin:0 0 9px">'+
+  '&#8592; back to the cluster</div>';
+
+function coclearRow(c){
+  if(!VERIFIED) return '';
+  const js = c.es.filter(judgedE);
+  if(!js.length)
+    return row('Alarm co-clear', '<span style="opacity:.55">nothing judgeable</span>');
+  const ok = js.filter(e => e.dc <= tolOf(e)).length;
+  const f = ok / js.length;
+  const col = f === 1 ? EDGE_OK : (f >= 0.5 ? EDGE_MID : EDGE_BAD);
+  return row('Alarm co-clear', '<span style="color:'+col+'">'+ok+' of '+js.length+
+    '</span> <span style="opacity:.55">judged'+
+    (js.length < c.es.length ? ', '+(c.es.length-js.length)+' not' : '')+
+    '</span>');
+}
+
+function criteriaBlock(c){
+  if(!VERIFIED) return '';
+  const dim = s => '<span style="opacity:.55">'+s+'</span>';
+  let h = '<div style="margin-top:10px;opacity:.6;font-size:11px">how the lines '+
+    'are judged</div>';
+  if(BY_KIND){
+    const kinds = new Map();
+    for(const i of c.al){
+      const a = G.alarms[i], k = a.n;
+      if(alarmSyn(a)) continue;
+      if(!kinds.has(k)) kinds.set(k, {n: 0, tol: a.tol, tl: !!a.tl, syn: false});
+      kinds.get(k).n++;
+    }
+    const ks = [...kinds].sort((x, y) => y[1].n - x[1].n);
+    h += ks.slice(0, 8).map(([k, v]) => row(esc(G.strings[k]),
+      (v.syn ? dim('synthetic: not judged') : v.tol != null
+        ? '&#8804;'+durT(v.tol)+(v.tl ? ' '+dim('by lift') : '') : dim('no tolerance'))+' '+
+      dim(fmt(v.n)+' alarm'+(v.n === 1 ? '' : 's')))).join('')+
+      (ks.length > 8 ? '<div class="hint">+'+(ks.length-8)+' more kinds</div>' : '')+
+      '<div class="hint" style="margin:3px 0 6px">a line is judged by the '+
+      'larger tolerance of its two alarms</div>';
+  }
+  const by = new Map();
+  let noClear = 0;
+  const nj = new Map();
+  for(const e of c.es){
+
+    if(alarmSyn(G.alarms[e.i]) || alarmSyn(G.alarms[e.j])) continue;
+    if(e.dc == null){ noClear++; continue; }
+    if(e.nj){ nj.set(e.nj, (nj.get(e.nj) || 0) + 1); continue; }
+    const t = tolOf(e);
+    if(!by.has(t)) by.set(t, {ok: 0, bad: 0});
+    by.get(t)[e.dc <= t ? 'ok' : 'bad']++;
+  }
+  h += [...by].sort((x, y) => x[0] - y[0]).map(([t, v]) =>
+    row('&#8804;'+durT(t)+' '+dim(fmt(v.ok+v.bad)+' line'+(v.ok+v.bad === 1 ? '' : 's')),
+      '<span style="color:'+EDGE_OK+'">'+fmt(v.ok)+' together</span>'+
+      (v.bad ? ' <span style="color:'+EDGE_BAD+'">'+fmt(v.bad)+' apart</span>' : ''))).join('');
+  const not = noClear + [...nj.values()].reduce((a, b) => a + b, 0);
+  if(not)
+    h += row('not judged '+dim(fmt(not)+' line'+(not === 1 ? '' : 's')),
+      dim([noClear ? fmt(noClear)+' no clear time at one end' : '']
+        .concat([...nj].map(([k, v]) => fmt(v)+' '+(NJ_WHY[k] || 'no yardstick')))
+        .filter(Boolean).join(' &#183; ')));
+  return h;
+}
+
+function incidentRow(c){
+  if(!M.by_incident) return '';
+  const mcs = new Set(c.al.map(i => G.alarms[i].mc).filter(x => x != null));
+  return row('the model\'s clusters in it', mcs.size > 1
+    ? '<span style="color:#bc8cff">'+mcs.size+'</span> <span style="opacity:.55">joined through a ticket that spans them</span>'
+    : '1 <span style="opacity:.55">nothing joined through a ticket</span>');
+}
+
+function tkRecallRows(c){
+  const r = tkRecall(c);
+  if(!r || !r.all) return '';
+  const dim = s => '<span style="opacity:.55">'+s+'</span>';
+  const out = r.other + r.alone;
+  if(!out) return '';
+
+  const why = {late: 0, far: 0, low: 0, avg: 0};
+  let known = false;
+  for(const x of ticketsOf(c)){
+    const k = TK[x.k];
+    const w = k.owg && x.als.length ? k.owg[String(Math.min(...x.als))] : null;
+    if(!w) continue;
+    known = true;
+    for(const q in w) why[q] = (why[q] || 0) + w[q];
+  }
+  const parts = WHY_SHORT.filter(([w]) => why[w]).map(([w, l]) => l+' '+fmt(why[w]));
+  return row('outside this cluster', '<span style="color:'+EDGE_BAD+'">'+fmt(out)+'</span> '+
+        dim('from '+fmt(r.split)+' ticket'+(r.split === 1 ? '' : 's')))+
+      '<div class="hint" style="margin:-2px 0 2px;text-align:right">'+
+        [r.other ? fmt(r.other)+' in another cluster' : '',
+         r.alone ? fmt(r.alone)+' in no cluster' : ''].filter(Boolean).join(' &#183; ')+'</div>'+
+      (known && parts.length
+        ? '<div class="hint" style="margin:0 0 6px;text-align:right">why: '+parts.join(' &#183; ')+'</div>'
+        : '');
+}
+function showCluster(){
+  const c = clusters[curIdx];
+
+  const catSites = new Map();
+  for(const i of c.al){
+    const a = G.alarms[i];
+    if(!catSites.has(a.c)) catSites.set(a.c, new Set());
+    catSites.get(a.c).add(a.s);
+  }
+  const cats = new Map([...catSites].map(([k, v]) => [k, v.size]));
+  $('detail').innerHTML =
+    '<h2>Cluster</h2>'+
+    rootRowOf(c) +
+    row('alarms', fmt(c.al.length)) +
+    row('sites', fmt(c.nSites) + (c.sites.length > c.nSites
+      ? ' <span style="opacity:.55">+' + (c.sites.length - c.nSites) +
+        ' on the path</span>' : '')) +
+    row('pairs', fmt(c.es.length)) + coclearRow(c) +
+
+    tkRecallRows(c) +
+    rcRowOf(c) + rpRowOf(c) + woRowOf(c) +
+
+    spreadRowOf(c) + blastRowOf(c) +
+    [...cats].sort((a,b)=>b[1]-a[1]).slice(0,4).map(p=>
+      row('<span class="chip" style="background:'+catColor(p[0])+'">'+
+          G.strings[p[0]]+'</span>', fmt(p[1])+
+          ' <span style="opacity:.55">site'+(p[1] === 1 ? '' : 's')+'</span>')).join('')+
+    criteriaBlock(c)+seqBlock(c);
+  wireDetail();
+}
+
+function bundleCounts(ks){
+  const js = ks.map(k => E[k].ref).filter(judgedE);
+  return {n: ks.length, judged: js.length,
+          ok: js.filter(m => m.dc <= tolOf(m)).length};
+}
+function bundleTip(e){
+  const ks = bundleShown(e), c = bundleCounts(ks);
+  return G.sites[G.alarms[N[e.a].ref].s].n+' '+DASH+' '+
+         G.sites[G.alarms[N[e.b].ref].s].n+': '+c.n+' pair'+(c.n === 1 ? '' : 's')+
+         (VERIFIED && c.judged ? ', '+c.ok+' of '+c.judged+' co-cleared' : '');
+}
+function showEdge(k){
+  const e = E[k];
+
+  if(e.kind === 'tklink'){ showNode(e.b); return; }
+  if(e.kind === 'synjudge' || e.kind === 'synsyn'){
+
+    const sv = synJudgeInfo(e), two = e.kind === 'synsyn';
+    const ks = two ? [TK[N[e.a].tk], TK[N[e.b].tk]] : [TK[e.tk]];
+    const verdict = !sv
+      ? row('cleared apart', '<span style="opacity:.55">not judged: '+
+          (two ? (ks[0].sc == null || ks[1].sc == null ? 'no real clear at one end' : 'no yardstick')
+               : (G.alarms[N[e.a].ref].ct == null || G.alarms[N[e.b].ref].ct == null
+                  ? 'no real clear at one end' : 'neither kind has a tolerance'))+'</span>')
+      : row('cleared apart', '<span style="color:'+(sv.ok ? '#4ade80' : '#f87171')+'">'+dur(sv.dc)+
+          (sv.ok ? ' together' : ' apart')+'</span>')+
+        row('judged by', '&#8804;'+durT(sv.tol)+' <span style="opacity:.55">'+
+          (sv.flat ? 'the page\'s flat tolerance: neither synthetic kind has one'
+                   : 'the larger tolerance of the kinds that have one')+'; not counted in any score</span>');
+    $('detail').innerHTML = backLink() +
+      '<h2>'+(two ? 'Two synthetic alarms' : 'Alarm and its synthetic alarm')+'</h2>'+
+      '<div style="margin-top:8px">'+
+      ks.map(k => row('ticket', '<span style="color:var(--find)">'+esc(k.id)+'</span> '+
+        '<span style="color:'+SYNC+'">'+esc(k.syn || '')+'</span>')+
+        (two ? row('its synthetic alarm cleared', k.sc != null ? iso(k.sc)+' '+TZL : DASH) : '')).join('')+
+      verdict+'</div>'+
+      (two ? '' : alarmLine(N[e.a].ref)+alarmLine(N[e.b].ref));
+    wireDetail();
+    return;
+  }
+  if(e.kind === 'synlink'){ showNode(SYN_LOW ? e.b : e.a); return; }
+  if(e.kind === 'rcup' || e.kind === 'wolink'){ showNode(e.b); return; }
+
+  if(e.kind === 'nepost' || e.kind === 'necell'){ showNode(e.b); return; }
+  if(e.kind === 'anc' || e.kind === 'nelink' || e.kind === 'nex2' || e.dev){ showNode(e.a); return; }
+  if(e.kind === 'bundle'){
+    const ks = bundleShown(e), c = bundleCounts(ks), ms = ks.map(j => E[j].ref);
+    const sa = G.alarms[N[e.a].ref].s, sb = G.alarms[N[e.b].ref].s;
+    const top = ms.slice().sort((x, y) => (y.s ?? -1e9) - (x.s ?? -1e9));
+    const col = bundleColor(ks);
+    $('detail').innerHTML = backLink() +
+      '<h2>Site pair</h2>'+
+      '<div style="font-size:14px;color:#fff">'+esc(G.sites[sa].n)+' '+DASH+' '+
+        esc(G.sites[sb].n)+'</div>'+
+      '<div style="margin-top:8px">'+
+      row('alarm pairs', fmt(c.n))+
+      (VERIFIED ? row('co-clear', c.judged
+        ? '<span style="color:'+col+'">'+c.ok+' of '+c.judged+'</span>'+
+          ' <span style="opacity:.55">judged</span>'
+        : '<span style="opacity:.55">nothing judgeable</span>') : '')+
+      row('best score', top[0].s == null ? DASH : top[0].s.toFixed(2))+
+      row('fired apart', dur(Math.min(...ms.map(m => m.g)))+
+          (ms.length > 1 ? ' '+DASH+' '+dur(Math.max(...ms.map(m => m.g))) : ''))+
+      row('topology', hopLabel(ms[0].h))+
+      row('distance', ms[0].d == null ? 'no coords' : ms[0].d.toFixed(1)+' km')+
+      '</div>'+
+      '<div style="margin-top:10px;opacity:.6;font-size:11px">strongest pairs</div>'+
+      top.slice(0, 5).map(m => alarmLine(m.i)+alarmLine(m.j)+
+        '<hr style="margin:6px 0;opacity:.3">').join('');
+    wireDetail();
+    return;
+  }
+  if(e.kind === 'held'){
+    $('detail').innerHTML = backLink() + '<h2>Held by its ticket</h2>' +
+      '<div class="hint" style="margin:4px 0 8px">not a model pair: the model linked this alarm to nothing, '+
+      'and its ticket holds it here (no score, not judged)</div>' + alarmLine(N[e.b].ref) + alarmLine(N[e.a].ref);
+    wireDetail();
+    return;
+  }
+  if(e.kind !== 'corr'){
+    const a=N[e.a], b=N[e.b];
+    $('detail').innerHTML = backLink() + (e.kind==='topo'
+      ? '<h2>Topology</h2><div style="font-size:14px;color:#fff">'+
+        G.sites[a.ref].n+' '+DASH+' '+G.sites[b.ref].n+'</div>'
+      : '<h2>Alarm to its site</h2>');
+    wireDetail();
+    return;
+  }
+  const m = e.ref, A = G.alarms[m.i], B = G.alarms[m.j];
+  const hopName = hopLabel(m.h);
+  $('detail').innerHTML = backLink() +
+    '<h2>Pair</h2>'+
+    '<div style="font-size:14px;color:#fff">'+G.sites[A.s].n+' '+ARR+' '+
+      G.sites[B.s].n+'</div>'+
+    '<div style="margin-top:8px">'+
+    row('score', m.s == null
+      ? '<span style="opacity:.55">not a model pair</span>' : m.s.toFixed(2))+
+    row('fired apart', dur(m.g))+
+    clearGapRow(m)+
+    row('topology', hopName)+
+    row('distance', m.d==null?'no coords':m.d.toFixed(1)+' km')+
+    '</div>'+alarmLine(m.i)+alarmLine(m.j);
+  wireDetail();
+}
+
+function rcRows(k){
+  if(!k.rc) return HAS_RC ? row('resolution', '<span style="opacity:.55">not in the incident files</span>') : '';
+  return k.rc.map((v, j) => row('resolution tier '+(j+1), v ? esc(v) : DASH)).join('')+
+    (k.rj ? '' : '<div class="hint" style="margin:-2px 0 6px">names no cause: no root-cause line</div>');
+}
+
+function rpRows(k){
+  if(!HAS_RP) return '';
+  if(!k.rp) return row('predicted', '<span style="opacity:.55">not judged (not trainable: blank / CC / cancelled)</span>');
+  const tier = (v, ok) => '<span style="color:'+(ok ? RP_OK : RP_BAD)+'">'+(v ? esc(v) : DASH)+'</span>';
+  return '<div class="hint" style="margin:8px 0 4px">predicted at Reported_time, test day '+esc(RP.day)+
+      ' &#183; <span style="color:'+RP_OK+'">right</span> / <span style="color:'+RP_BAD+'">wrong</span> per tier</div>'+
+    (k.rt ? row('truth as a class', k.rt.map(v => esc(v)).join(RP_SEP)) : '')+
+    k.rp.map(([m, p, ok]) => {
+      const s = RP_MODELS.find(x => x.model === m);
+      return row(esc(s ? s.name : m), p.map((v, j) => tier(v, ok[j])).join(RP_SEP));
+    }).join('');
+}
+
+function rpRowOf(c){
+  if(!HAS_RP) return '';
+  const ks = [...new Set(ticketsOf(c).map(x => x.k))].map(k => TK[k]).filter(k => k.rp);
+  if(!ks.length) return row('predicted', '<span style="opacity:.55">no ticket here is judged</span>');
+  const col = (x, n) => x === n ? RP_OK : x * 2 > n ? '#fbbf24' : RP_BAD;
+  return '<div class="hint" style="margin:8px 0 4px">resolution predicted right: tier 1 / tier 2 / path</div>'+
+    RP_MODELS.map(s => {
+      const vs = ks.map(k => k.rp.find(r => r[0] === s.model)).filter(Boolean), n = vs.length;
+      if(!n) return '';
+      const t1 = vs.filter(r => r[2][0]).length, t2 = vs.filter(r => r[2][1]).length,
+            pa = vs.filter(r => r[2].every(Boolean)).length;
+      return row(esc(s.name), [t1, t2, pa].map(x => '<span style="color:'+col(x, n)+'">'+x+'</span>').join(' / ')+
+        ' <span style="opacity:.55">of '+n+' ticket'+(n === 1 ? '' : 's')+'</span>');
+    }).join('');
+}
+
+function rcRowOf(c){
+  if(!HAS_RC) return '';
+  const ks = [...new Set(ticketsOf(c).map(x => x.k))].map(k => TK[k]).filter(k => k.rj);
+  if(ks.length < 2) return row('same root cause', '<span style="opacity:.55">fewer than 2 tickets name a cause</span>');
+  const cnt = new Map();
+  for(const k of ks) cnt.set(k.rj, (cnt.get(k.rj) || 0) + 1);
+  const [top, m] = [...cnt].sort((x, y) => y[1] - x[1])[0];
+  return row('same root cause', '<span title="'+esc(top)+'" style="color:'+
+    (m === ks.length ? '#4ade80' : m * 2 > ks.length ? '#fbbf24' : '#f87171')+'">'+
+    m+' of '+ks.length+' tickets</span>');
+}
+
+function woRowOf(c){
+  if(!HAS_WO) return '';
+  const ks = [...new Set(ticketsOf(c).map(x => x.k))].map(k => TK[k]);
+  const ws = ks.flatMap(k => k.wo || []), live = ws.filter(w => !woCanceled(w));
+  const withWo = ks.filter(k => (k.wo || []).length).length;
+  if(!ws.length) return row('work orders', '<span style="opacity:.55">none of its '+ks.length+' tickets opened one</span>');
+  const st = new Map();
+  for(const w of ws) st.set(w.st || '?', (st.get(w.st || '?') || 0) + 1);
+  const rcs = new Set(live.map(w => w.rc).filter(Boolean));
+  return row('work orders', '<span style="color:'+WOC+'" title="'+esc([...st].map(([s, n]) => s+' '+n).join(', '))+'">'+
+      live.length+'</span> <span style="opacity:.55">opened'+(ws.length > live.length ? ' (+'+(ws.length - live.length)+' cancelled)' : '')+
+      ' by '+withWo+' of '+ks.length+' tickets</span>')+
+    (rcs.size ? row('WO root causes', rcs.size === 1 ? esc([...rcs][0])
+      : '<span style="color:#fbbf24">'+rcs.size+' different</span>') : '');
+}
+
+function woRows(k){
+  if(!HAS_WO) return '';
+  const ws = k.wo || [];
+  if(!ws.length) return row('work orders', '<span style="opacity:.55">none in the work-order exports</span>');
+  return ws.map(w => row('work order', '<span style="color:'+(woCanceled(w) ? WO_NONE : WOC)+'">'+esc(w.id)+'</span> '+
+    '<span style="opacity:.6">'+esc(w.st || '')+' '+DEG+' '+iso(w.t).slice(5, 16)+'</span>')).join('');
+}
+function showNode(i){
+  const n = N[i];
+  if(n.type==='site'){
+    const s = G.sites[n.ref];
+    const mine = clusters[curIdx].al.filter(a => G.alarms[a].s===n.ref);
+    const roles = (s.r && s.r.length)
+      ? s.r.map(x => G.strings[x[0]]).join(', ') : null;
+    $('detail').innerHTML = backLink() +
+      '<h2>Site</h2><div style="font-size:14px;color:#fff">'+s.n+'</div>'+
+      transitNote(n.ref)+
+      '<div style="margin-top:8px">'+
+      row('province', s.p || DASH)+
+      row('alarms here', mine.length+' of '+fmt(s.a))+
+      (roles ? row('roles', roles) : '')+
+      (s.lat!=null ? row('lat, lon',
+                         s.lat.toFixed(4)+', '+s.lon.toFixed(4)) : '')+
+      '</div>';
+  } else if(n.type==='ne'){
+
+    const r = NES[n.ref], own = neAlarms(n.ref);
+    const onCells = r.k === 'CELL' ? [] : clusters[curIdx].al.filter(j => G.alarms[j].ne != null &&
+                                                                       NES[G.alarms[j].ne].p === n.ref);
+    const nb = [];
+    E.forEach(e => {
+      if((e.kind === 'nelink' || e.kind === 'nex2') && (e.a === i || e.b === i))
+        nb.push((e.kind === 'nex2' ? 'X2/Xn ' : '')+esc(neName(e.a === i ? e.b : e.a)));
+    });
+    $('detail').innerHTML = backLink() +
+      '<h2>'+esc(NE_WORDS[r.k] || r.k)+'</h2><div style="font-size:14px;color:'+NE_COL[n.fl]+'">'+
+      esc(G.strings[r.n])+'</div><div style="margin-top:8px">'+
+      row('site', esc(G.sites[r.s].n))+
+      (r.p != null ? row('served by', esc(G.strings[NES[r.p].n])) : '')+
+      row('alarms on it', own.length ? fmt(own.length)
+          : '<span style="opacity:.55">none in this cluster'+(r.st ? ' (one of the site\'s own devices)' : '')+'</span>')+
+      (onCells.length ? row('on its cells', fmt(onCells.length)) : '')+
+      (nb.length ? row('linked on screen', nb.join('<br>')) : '')+
+      '</div>'+own.concat(onCells).slice(0, 20).map(alarmLine).join('');
+  } else if(n.type==='ticket'){
+    const k = TK[n.ref], al = G.alarms[n.near];
+    $('detail').innerHTML = backLink() +
+      '<h2>Ticket</h2><div style="font-size:14px;color:#fff">'+esc(k.id)+'</div>'+
+      '<div style="margin-top:8px">'+
+      row('site', esc(G.sites[k.s].n))+
+      (n.als && !n.als.some(i => G.alarms[i].s === k.s)
+        ? '<div class="hint" style="margin:-2px 0 6px">none of its alarms at '+esc(G.sites[k.s].n)+
+          ' is in this cluster: it stands over '+esc(G.sites[al.s].n)+', its nearest alarm here'+
+          (M.by_incident ? '' : ' (an incident page, --by-incident, joins the clusters it spans)')+'</div>' : '')+
+      row(esc(TKM.time_col || 'time'), iso(k.t)+' '+TZL)+
+      (n.als ? row('its alarms in this cluster', fmt(n.als.length)+
+                 (k.na != null ? ' of '+fmt(Math.max(k.na, n.als.length)) : ''))+
+               (tkPartial(n) ? row('the others', '<span style="color:'+EDGE_BAD+'">'+
+                 tkElsewhere(k, n.als.length)+'</span>') : '')
+             : row('nearest alarm there', sgn(n.d)))+
+      (k.syn ? row('synthetic alarm', '<span style="color:'+SYNC+'">'+esc(k.syn)+'</span>') : '')+
+      rcRows(k)+rpRows(k)+woRows(k)+
+      (k.st ? row('status', esc(k.st)) : '')+
+      (k.cl ? row('classification', esc(k.cl)) : '')+
+      (k.tt ? row('TT id', esc(k.tt)) : '')+
+      '</div><div style="margin-top:10px;opacity:.6;font-size:11px">the alarm nearest '+
+      'in time at this site</div>'+alarmLine(n.near)+outsideBlock(n, k);
+  } else if(n.type==='syn' && n.tk != null){
+
+    const k = TK[n.tk], sa = synAlarmHere(n);
+    $('detail').innerHTML = backLink() +
+      '<h2>Synthetic alarm</h2><div style="font-size:14px;color:'+SYNC+'">'+
+      esc(n.ref)+'</div><div style="margin-top:8px">'+
+      row('ticket', '<span style="color:var(--find)">'+esc(k.id)+'</span>')+
+      row('its site', esc(G.sites[k.s].n))+
+      row('the alarm itself', synWhere(n))+
+      row('alarms tied to it here', fmt(E.filter(e => e.kind === 'synlink' && N[e.b] === n &&
+                                                     N[e.a].type === 'alarm').length))+
+      (() => {
+        const vs = E.filter(e => e.kind === 'synjudge' && e.tk === n.tk).map(synJudgeInfo).filter(v => v);
+        if(k.sc == null) return row('cleared with it', '<span style="opacity:.55">it has no real clear</span>');
+        if(!vs.length) return '';
+        const ok = vs.filter(v => v.ok).length;
+        return row('cleared with it', '<span style="color:'+(ok === vs.length ? '#4ade80' : ok ? '#fbbf24' : '#f87171')+
+          '">'+ok+' of '+vs.length+' judged</span>');
+      })()+
+      '</div>'+(sa != null ? alarmLine(sa) : '');
+  } else if(n.type==='wo'){
+
+    const k = TK[n.tk], w = k.wo[n.w];
+    $('detail').innerHTML = backLink() +
+      '<h2>Work order</h2><div style="font-size:14px;color:'+(woCanceled(w) ? WO_NONE : WOC)+'">'+esc(w.id)+'</div>'+
+      '<div class="hint" style="margin:4px 0 8px">corrective maintenance; written by the field teams, '+
+        'a yardstick the model never saw</div>'+
+      row('ticket', '<span style="color:var(--find)">'+esc(k.id)+'</span> '+
+        '<span style="opacity:.55">'+(k.wo.length > 1 ? k.wo.length+' WOs' : 'its only WO')+'</span>')+
+      row('status', esc(w.st || DASH))+
+      row('created', iso(w.t)+' '+TZL+' <span style="opacity:.55">('+dur(w.t - k.t)+' after the ticket)</span>')+
+      (w.dm ? row('domain', esc(w.dm)) : '')+
+      row('root cause', w.rc ? esc(w.rc) : DASH)+
+      (w.sr ? row('sub root cause', esc(w.sr)) : '')+
+      (w.so ? row('solution', esc(w.so)) : '');
+  } else if(n.type==='rc'){
+
+    const ks = wallBands[n.band].members.map(m => TK[N[m].ref]).sort((x, y) => x.t - y.t);
+    const all = new Set(N.filter(q => q.type === 'ticket').map(q => q.ref)).size;
+    $('detail').innerHTML = backLink() +
+      '<h2>Resolution</h2><div style="font-size:14px;color:'+(n.cause ? RCC : RC_NONE)+'">'+esc(n.ref)+'</div>'+
+      '<div class="hint" style="margin:4px 0 8px">'+esc(RC_BY)+(n.cause ? '' : ' '+DEG+' names no cause')+
+        '; written by the people who closed the tickets, a yardstick the model never saw</div>'+
+      row('tickets here', fmt(ks.length)+' <span style="opacity:.55">of '+fmt(all)+' in this cluster</span>')+
+      ks.map(k => row('<span style="color:#fff;font-weight:600">'+esc(G.sites[k.s].n)+
+        '</span> <span style="color:var(--find)">'+esc(k.id)+'</span>', iso(k.t).slice(11))).join('');
+  } else if(n.type==='syn'){
+    const ks = n.cent.map(m => TK[N[m].ref]).sort((x, y) => x.t - y.t);
+    $('detail').innerHTML = backLink() +
+      '<h2>Synthetic alarm</h2><div style="font-size:14px;color:'+SYNC+'">'+
+      esc(n.ref)+'</div><div style="margin-top:8px">'+
+      row('tickets naming it', fmt(ks.length))+
+      row('sites', fmt(new Set(ks.map(k => k.s)).size))+'</div>'+
+      ks.map(k => row('<span style="color:#fff;font-weight:600">'+esc(G.sites[k.s].n)+
+        '</span> <span style="color:var(--find)">'+esc(k.id)+'</span>',
+        iso(k.t).slice(11))).join('');
+  } else {
+    $('detail').innerHTML = backLink()+'<h2>Alarm</h2>'+alarmLine(n.ref);
+  }
+  wireDetail();
+}
+
+function selectCluster(i){
+  curIdx = i; sel = null; hover = null; tlAll = false;
+  $('empty').style.display='none';
+  cam = {x:0,y:0,k:1};
+  playerSetup();
+  renderList(); initSim(); showCluster();
+
+  const hasTk = N.some(n => n.type === 'ticket');
+  if(view3d && (hasTk || LIFT > 0)){
+    const top = (hasTk ? Math.max(TK_Z, N.some(n => n.type === 'syn') ? SYN_Z : 0, N.some(n => n.type === 'rc') ? RC_Z : 0,
+                                  N.some(n => n.type === 'wo') ? WO_Z : 0) : 1) + LIFT;
+    const H = Math.max(LAYER_MIN, Math.min(LAYER_MAX, layoutBox().span*LAYER_FRACTION));
+    const down = (top - 1) * H * Math.cos(elev) / 2 / Math.sin(elev);
+    cam.x -= down * Math.sin(yaw);
+    cam.y -= down * Math.cos(yaw);
+    if(!raf) draw();
+  }
+}
+
+let playT = null, playOn = false, playRaf = null, playLast = 0, playAcc = 0;
+let playT0 = 0, playSpan = 0, moments = [], siteFirst = new Map();
+let playNowT = null, seqK = null;
+const MOMENT_MS = 900;
+const ICON_PLAY  = '<svg viewBox="0 0 12 12"><path d="M3 1.5l7.5 4.5L3 10.5z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 12 12"><path d="M2.5 2h2.4v8H2.5zM7.1 2h2.4v8H7.1z"/></svg>';
+
+const alarmShown = i => playT == null || G.alarms[i].t - playT0 <= playT;
+
+const PH_SYN = () => SYN_LOW ? .25 : .5, PH_TK = () => SYN_LOW ? .5 : .25;
+const PH_RC = .75;
+
+const woAt = (k, j) => Math.max(TK[k].wo[j].t, TK[k].t + .9);
+
+const shownAt = n => n.type === 'alarm' ? G.alarms[n.ref].t
+  : n.type === 'ticket' ? TK[n.ref].t + PH_TK()
+  : n.type === 'syn' ? (n.tk != null ? TK[n.tk].t : Math.min(...n.cent.map(m => TK[N[m].ref].t))) + PH_SYN()
+  : n.type === 'rc' ? Math.min(...n.cent.map(m => TK[N[m].ref].t)) + PH_RC
+  : n.type === 'wo' ? woAt(n.tk, n.w)
+  : null;
+const nodeShown  = n => playT == null || n.type === 'site' || n.type === 'ne' ||
+                        shownAt(n) - playT0 <= playT;
+const ticketShown = k => playT == null || TK[k].t + PH_TK() - playT0 <= playT;
+const edgeShown  = e => nodeShown(N[e.a]) && nodeShown(N[e.b]);
+
+const siteQuiet  = s => playT != null && siteFirst.has(s) &&
+                        siteFirst.get(s) > playT;
+
+function momentAt(t){
+  let lo = 0, hi = moments.length - 1, k = -1;
+  while(lo <= hi){
+    const m = (lo + hi) >> 1;
+    if(moments[m] <= t){ k = m; lo = m + 1; } else hi = m - 1;
+  }
+  return k;
+}
+
+function playerSetup(){
+  playOn = false;
+  if(playRaf) cancelAnimationFrame(playRaf);
+  playRaf = null; playT = null; playNowT = null; seqK = null; nowK = null;
+  const c = clusters[curIdx], A = G.alarms;
+
+  const tkx = ticketsOf(c);
+  const ts = [...new Set(c.al.map(i => A[i].t)
+                .concat(tkx.map(x => TK[x.k].t + PH_TK()))
+                .concat(tkx.filter(x => TK[x.k].syn).map(x => TK[x.k].t + PH_SYN()))
+                .concat(HAS_RC ? tkx.filter(x => rcKey(TK[x.k])).map(x => TK[x.k].t + PH_RC) : [])
+                .concat(HAS_WO ? tkx.flatMap(x => (TK[x.k].wo || []).map((_, j) => woAt(x.k, j))) : []))]
+             .sort((x, y) => x - y);
+  playT0 = ts[0];
+
+  moments = [-1].concat(ts.map(t => t - playT0));
+  playSpan = moments[moments.length - 1];
+  siteFirst = new Map();
+  for(const i of c.al){
+    const s = A[i].s, t = A[i].t - playT0;
+    if(!siteFirst.has(s) || t < siteFirst.get(s)) siteFirst.set(s, t);
+  }
+  const bar = $('plBar');
+  bar.min = -1;
+  bar.max = Math.max(1, playSpan);
+  bar.disabled = moments.length < 2;
+  $('player').hidden = false;
+  playerUI();
+}
+
+const NOW_ROWS = 12;
+let nowK = null;
+function renderNow(){
+  const card = $('nowCard');
+  if(playT == null || curIdx < 0 || !clusters[curIdx]){
+    card.hidden = true; nowK = null; return;
+  }
+  if(playT < 0){ card.hidden = true; nowK = null; return; }
+  const k = Math.max(0, momentAt(playT));
+  if(k === nowK && !card.hidden) return;
+  nowK = k;
+
+  const A = G.alarms, tm = playT0 + moments[k], t = Math.floor(tm), ph = tm - t + 1e-9;
+  const al = clusters[curIdx].al.filter(i => A[i].t === t);
+  const atT = ticketsOf(clusters[curIdx]).filter(x => TK[x.k].t === t);
+  const tks = ph >= PH_TK() ? atT : [];
+  const syns = ph >= PH_SYN() ? atT.filter(x => TK[x.k].syn) : [];
+  const fresh = new Set(al.map(i => A[i].s)
+                          .filter(s => siteFirst.get(s) === t - playT0));
+  const groups = new Map();
+  for(const i of al){
+    if(!groups.has(A[i].c)) groups.set(A[i].c, []);
+    groups.get(A[i].c).push(i);
+  }
+  let h = '<div class="nc-h" title="click to fold &#183; drag to move"><b>T+'+
+    (t === playT0 ? '0s' : dur(t - playT0))+
+    '</b><span>'+iso(t).slice(11)+' '+TZL+'</span><span>'+DEG+' '+
+    (al.length || !tks.length ? al.length+' alarm'+(al.length === 1 ? '' : 's') : '')+
+    (tks.length ? (al.length ? ' '+DEG+' ' : '')+tks.length+' ticket'+
+      (tks.length === 1 ? '' : 's') : '')+
+    (fresh.size ? ' '+DEG+' '+fresh.size+' new site'+
+      (fresh.size === 1 ? '' : 's') : '')+'</span>'+
+    '<span class="nc-fold">'+(nowFold ? '&#9656;' : '&#9662;')+'</span></div>';
+
+  let rows = 0;
+  for(const [cat, is] of [...groups].sort((x, y) => y[1].length - x[1].length)){
+    if(rows >= NOW_ROWS) break;
+    h += '<div class="nc-g"><span class="chip" style="background:'+
+      catColor(cat)+'">'+esc(G.strings[cat])+'</span>'+
+      (is.length > 1 ? ' <span class="nc-v">'+is.length+'</span>' : '');
+    for(const i of is){
+      if(rows >= NOW_ROWS) break;
+      const a = A[i], full = G.strings[a.n], sn = shortName(full);
+      h += '<div class="nc-r" title="'+esc(full)+'">'+
+        '<span class="nc-s">'+esc(G.sites[a.s].n)+'</span>'+
+        '<span class="nc-n">'+esc(sn.name)+
+          (a.o > 1 ? ' '+DEG+' '+a.o+'x' : '')+'</span>'+
+        (sn.vendor ? '<span class="nc-v">'+esc(sn.vendor)+'</span>' : '')+
+        (fresh.has(a.s) ? '<span class="nc-new">new site</span>' : '')+
+        '</div>';
+      rows++;
+    }
+    h += '</div>';
+  }
+
+  if(syns.length){
+    h += '<div class="nc-g"><span class="chip" style="background:'+SYNC+'">SYNTHETIC</span>'+
+      (syns.length > 1 ? ' <span class="nc-v">'+syns.length+'</span>' : '');
+    for(const x of syns.slice(0, NOW_ROWS)){
+      const k = TK[x.k];
+      h += '<div class="nc-r" title="'+esc(k.syn)+'">'+
+        '<span class="nc-s">'+esc(G.sites[k.s].n)+'</span>'+
+        '<span class="nc-n" style="color:'+SYNC+'">'+esc(k.syn)+'</span></div>';
+    }
+    h += '</div>';
+  }
+  if(tks.length){
+    h += '<div class="nc-g"><span class="chip" style="background:'+TKC+'">TICKET</span>'+
+      (tks.length > 1 ? ' <span class="nc-v">'+tks.length+'</span>' : '');
+    for(const x of tks.slice(0, NOW_ROWS)){
+      const k = TK[x.k];
+      h += '<div class="nc-r" title="'+esc(k.syn || '')+'">'+
+        '<span class="nc-s">'+esc(G.sites[k.s].n)+'</span>'+
+        '<span class="nc-n" style="color:var(--find)">'+esc(k.id)+'</span>'+
+        '<span class="nc-v">'+sgn(x.d)+' from its alarm</span></div>';
+    }
+    h += '</div>';
+  }
+  if(al.length > rows)
+    h += '<div class="nc-h nc-more" style="margin-top:6px">+'+
+      (al.length - rows)+' more '+DEG+' see Sequence</div>';
+  card.innerHTML = h;
+  card.classList.toggle('fold', nowFold);
+  card.hidden = false;
+  placeNow();
+}
+
+let nowFold = prefGet('nowFold') === '1';
+let nowPos = null;
+try{ nowPos = JSON.parse(prefGet('nowPos') || 'null'); }catch(e){ nowPos = null; }
+function placeNow(){
+  const card = $('nowCard'), st = $('stage');
+  if(!nowPos || card.hidden) return;
+
+  const x = Math.max(0, Math.min(st.clientWidth  - card.offsetWidth,  nowPos.x));
+  const y = Math.max(0, Math.min(st.clientHeight - card.offsetHeight, nowPos.y));
+  card.style.left = x+'px'; card.style.top = y+'px';
+}
+$('nowCard').addEventListener('mousedown', e => {
+  const head = e.target.closest('.nc-h');
+  if(!head || head !== $('nowCard').firstElementChild) return;
+  e.preventDefault();
+  const card = $('nowCard');
+  const x0 = e.clientX, y0 = e.clientY;
+  const l0 = card.offsetLeft, t0 = card.offsetTop;
+  let moved = false;
+  const move = ev => {
+    if(!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
+    moved = true;
+    nowPos = {x: l0 + ev.clientX - x0, y: t0 + ev.clientY - y0};
+    placeNow();
+  };
+  const up = () => {
+    removeEventListener('mousemove', move);
+    removeEventListener('mouseup', up);
+    if(moved){ prefSet('nowPos', JSON.stringify(nowPos)); return; }
+    nowFold = !nowFold;
+    prefSet('nowFold', nowFold ? '1' : '0');
+    card.classList.toggle('fold', nowFold);
+    const f = card.querySelector('.nc-fold');
+    if(f) f.innerHTML = nowFold ? '&#9656;' : '&#9662;';
+  };
+  addEventListener('mousemove', move);
+  addEventListener('mouseup', up);
+});
+
+function playerUI(){
+  const c = clusters[curIdx];
+  renderNow();
+  if(!c) return;
+  $('plPlay').innerHTML = playOn ? ICON_PAUSE : ICON_PLAY;
+  $('plBar').value = playT == null ? playSpan : playT;
+
+  if(playT == null){
+    $('plTime').innerHTML = 'press play to replay';
+    return;
+  }
+  if(playT < 0){
+    $('plTime').innerHTML = '<b>start</b> nothing has fired yet';
+    return;
+  }
+  $('plTime').innerHTML = '<b>T+'+(playT < 1 ? '0s' : dur(Math.floor(playT)))+
+    '</b> '+iso(playT0 + Math.floor(playT)).slice(11)+' '+TZL;
+}
+
+function syncSeq(scroll){
+  const d = $('detail');
+
+  d.classList.toggle('replaying', playT != null);
+  const k = playT == null ? null : momentAt(playT);
+  if(k === seqK) return;
+  seqK = k;
+  for(const el of d.querySelectorAll('.tl-e'))
+    el.classList.toggle('future', el.dataset.k != null
+      ? !ticketShown(+el.dataset.k) : !alarmShown(+el.dataset.a));
+  let now = null;
+  const nowS = playNowT == null ? null : Math.floor(playNowT);
+  for(const el of d.querySelectorAll('.tl-b, .tl-gap')){
+    const t = +el.dataset.t, gap = el.classList.contains('tl-gap');
+    const on = !gap && nowS != null && t === nowS;
+    el.classList.toggle('past', nowS != null && t < nowS);
+    el.classList.toggle('fut',  nowS != null && t > nowS);
+    if(gap) continue;
+    el.classList.toggle('now', on);
+    if(on) now = el;
+  }
+
+  if(!now && playNowT != null && playT >= 0 && !tlAll && $('tlmore')){
+    tlAll = true; showCluster();
+    return;
+  }
+  if(scroll && now) now.scrollIntoView({block:'nearest'});
+}
+
+function playSet(t, scroll){
+  playT = t;
+  playNowT = t == null ? null : playT0 + moments[Math.max(0, momentAt(t))];
+  playerUI();
+  syncSeq(scroll);
+  if(!raf) draw();
+}
+
+function playFrame(now){
+  const dt = now - playLast;
+  playLast = now;
+  const sp = $('plSpeed').value;
+  let t = playT, end = false;
+  if(sp === 'm'){
+    playAcc += dt;
+    if(playAcc >= MOMENT_MS){
+      playAcc = 0;
+      const k = momentAt(t);
+      if(k + 1 < moments.length) t = moments[k + 1];
+      else end = true;
+    }
+  } else {
+    t = Math.min(playSpan, t + dt/1000 * (+sp));
+    end = t >= playSpan;
+  }
+  if(t !== playT) playSet(t, true);
+  else if(!raf) draw();
+  if(end){ playStop(); return; }
+  playRaf = requestAnimationFrame(playFrame);
+}
+
+function playStart(){
+  if(curIdx < 0) return;
+
+  if(playT == null || playT >= playSpan) playSet(moments[0], true);
+  playOn = true; playLast = performance.now(); playAcc = 0;
+  playerUI();
+  playRaf = requestAnimationFrame(playFrame);
+}
+
+function playStop(ui = true){
+  playOn = false;
+  if(playRaf) cancelAnimationFrame(playRaf);
+  playRaf = null;
+  if(ui){ playerUI(); if(!raf) draw(); }
+}
+
+function playStep(d){
+  playStop();
+  let k = playT == null ? (d > 0 ? -1 : moments.length) : momentAt(playT);
+  k = Math.max(0, Math.min(moments.length - 1, k + d));
+  playSet(moments[k], true);
+}
+
+$('plPlay').onclick  = () => playOn ? playStop() : playStart();
+$('plPrev').onclick  = () => playStep(-1);
+$('plNext').onclick  = () => playStep(+1);
+$('plReset').onclick = () => { playStop(); playSet(moments[0], true); };
+$('plAll').onclick   = () => { playStop(); playSet(null, false); };
+$('plBar').addEventListener('input', () => {
+  playStop(false);
+  playSet(+$('plBar').value, false);
+});
+
+addEventListener('keydown', e => {
+  if(curIdx < 0 || $('player').hidden) return;
+  const tag = e.target.tagName;
+  if(tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  if(e.key === ' ' && tag === 'BUTTON') return;
+  if(e.key === ' ')               playOn ? playStop() : playStart();
+  else if(e.key === 'ArrowRight') playStep(+1);
+  else if(e.key === 'ArrowLeft')  playStep(-1);
+  else if(e.key === 'Home'){ playStop(); playSet(0, true); }
+  else if(e.key === 'End'){  playStop(); playSet(null, false); }
+  else return;
+  e.preventDefault();
+});
+
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+const esri = p => ({tile: (z, x, y) => ESRI + p + '/MapServer/tile/' + z + '/' + y + '/' + x,
+                    leaf: ESRI + p + '/MapServer/tile/{z}/{y}/{x}', attr: 'map &#169; Esri'});
+
+const OSM = {tile: (z, x, y) => 'https://tile.openstreetmap.org/' + z + '/' + x + '/' + y + '.png',
+             leaf: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+             attr: 'map &#169; OpenStreetMap contributors', max: 19, osm: true};
+const INVERT = 'invert(1) hue-rotate(180deg)';
+const MAP_BASES = {
+  osm:       {...OSM, blank: '#f2efe9', light: true},
+  osmdark:   {...OSM, blank: '#0d1016', invert: true},
+  streets:   {...esri('World_Street_Map'),            max: 18, blank: '#f2efe9', light: true},
+  satellite: {...esri('World_Imagery'),               max: 18, blank: '#1b1f24'},
+  dark:      {...esri('Canvas/World_Dark_Gray_Base'), max: 16, blank: '#262626'},
+};
+const FROM_FILE = location.protocol === 'file:';
+let mapOn = false;
+let mapBase = MAP_BASES[prefGet('mapBase')] ? prefGet('mapBase')
+                                            : (FROM_FILE ? 'streets' : 'osm');
+let geo = null;
+const tiles = new Map();
+let tileOk = 0, tileBad = 0, tileRedraw = false;
+
+function mapNote(html){
+  const n = $('mapNote');
+  n.hidden = !html;
+  n.innerHTML = html || '';
+}
+
+function merc(lat, lon){
+  const s = Math.sin(Math.max(-85.05, Math.min(85.05, lat)) * Math.PI/180);
+  return {x: (lon + 180) / 360 * 256,
+          y: (0.5 - Math.log((1 + s) / (1 - s)) / (4*Math.PI)) * 256};
+}
+
+function geoSites(sites){
+  const have = [], lost = [];
+  for(const s of sites){
+    const g = G.sites[s];
+    (g.lat != null && g.lon != null && isFinite(g.lat) && isFinite(g.lon)
+      ? have : lost).push(s);
+  }
+  if(!have.length){
+    geo = null;
+    mapNote('no site in this cluster has coordinates ' + DEG +
+            ' drawn as the graph instead');
+    return null;
+  }
+  const m = have.map(s => merc(G.sites[s].lat, G.sites[s].lon));
+  const xs = m.map(p => p.x), ys = m.map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const want = Math.max(280, Math.min(1100, 140*Math.sqrt(sites.length)));
+
+  const z = Math.max(4, Math.min(17, Math.log2(want / Math.max(x1-x0, y1-y0, 1e-9))));
+  const k = 2 ** z;
+  geo = {z, ox: (x0 + x1)/2*k, oy: (y0 + y1)/2*k, lost: lost.length};
+
+  const pos = new Map(), placed = [];
+  have.forEach((s, i) => {
+    const bx = m[i].x*k - geo.ox, by = m[i].y*k - geo.oy;
+    let x = bx, y = by;
+    for(let t = 1; t < 40 && placed.some(p => Math.hypot(p.x-x, p.y-y) < 12); t++){
+      const r = 14*(1 + t/8), ang = t*2.4;
+      x = bx + Math.cos(ang)*r; y = by + Math.sin(ang)*r;
+    }
+    placed.push({x, y});
+    pos.set(s, {x, y});
+  });
+
+  const east = (x1 - x0)/2*k + 90;
+  lost.forEach((s, i) => pos.set(s, {x: east, y: (i - (lost.length-1)/2)*60}));
+  mapNote(lost.length ? lost.length + ' site' + (lost.length === 1 ? '' : 's') +
+          ' with no coordinates ' + DEG + ' standing in a column east of the map'
+          : '');
+  return pos;
+}
+
+function redrawSoon(){
+  if(tileRedraw) return;
+  tileRedraw = true;
+  requestAnimationFrame(() => { tileRedraw = false; if(!raf) draw(); });
+}
+function tileAt(base, z, x, y){
+  const key = base + '/' + z + '/' + x + '/' + y;
+  let t = tiles.get(key);
+  if(t) return t;
+  if(tiles.size > 900) tiles.delete(tiles.keys().next().value);
+  t = {img: new Image(), ok: false, bad: false};
+  t.img.referrerPolicy = 'strict-origin-when-cross-origin';
+  t.img.onload  = () => { t.ok = true;  tileOk++;  redrawSoon(); };
+  t.img.onerror = () => { t.bad = true; tileBad++; redrawSoon(); };
+  t.img.src = MAP_BASES[base].tile(z, x, y);
+  tiles.set(key, t);
+  return t;
+}
+
+const LEAFLET = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/';
+let leafState = 'off';
+let leafMap = null, leafLayer = null, leafBase = null, leafCov = null;
+
+function loadLeaflet(){
+  if(leafState !== 'off') return;
+  leafState = 'loading';
+  const css = document.createElement('link');
+  css.rel = 'stylesheet'; css.href = LEAFLET + 'leaflet.css';
+  document.head.appendChild(css);
+  const s = document.createElement('script');
+  s.src = LEAFLET + 'leaflet.js';
+  const fail = () => {
+    leafState = 'failed';
+    mapNote('Leaflet could not load ' + DEG + ' drawing the map tiles directly');
+    if(!raf) draw();
+  };
+  s.onload = () => { if(window.L){ leafState = 'ready'; if(!raf) draw(); } else fail(); };
+  s.onerror = fail;
+  document.head.appendChild(s);
+}
+const leafOn = () => mapOn && !!geo && leafState === 'ready';
+
+function unmerc(px, py, z){
+  const n = 256 * 2 ** z;
+  return [Math.atan(Math.sinh(Math.PI * (1 - 2*py/n))) * 180/Math.PI,
+          px / n * 360 - 180];
+}
+
+function syncLeaf(a, b, c, d, e, f, wx0, wx1, wy0, wy1){
+  const B = MAP_BASES[mapBase], el = $('leaf');
+  el.hidden = false;
+  if(!leafMap)
+    leafMap = L.map(el, {zoomControl: false, attributionControl: false,
+      dragging: false, touchZoom: false, scrollWheelZoom: false,
+      doubleClickZoom: false, boxZoom: false, keyboard: false,
+      zoomSnap: 0, fadeAnimation: false, zoomAnimation: false,
+      markerZoomAnimation: false, inertia: false});
+  if(leafBase !== mapBase){
+    if(leafLayer) leafMap.removeLayer(leafLayer);
+
+    leafLayer = L.tileLayer(B.leaf, {maxZoom: 22, maxNativeZoom: B.max,
+                                     keepBuffer: 4, updateWhenIdle: false,
+                                     referrerPolicy: 'strict-origin-when-cross-origin'});
+    leafLayer.on('tileload', () => { tileOk++; });
+    leafLayer.on('tileerror', () => { tileBad++; leafNote(); });
+    leafLayer.addTo(leafMap);
+    leafBase = mapBase;
+    el.style.background = B.blank;
+    el.classList.toggle('inv', !!B.invert);
+  }
+
+  let zl = Math.max(2, Math.min(21, geo.z + Math.log2(cam.k)));
+  const cv0 = leafCov;
+  const fits = cv0 && cv0.geo === geo && Math.abs(cv0.zl - zl) < 0.6 &&
+               wx0 >= cv0.x0 && wx1 <= cv0.x1 && wy0 >= cv0.y0 && wy1 <= cv0.y1;
+  if(!fits){
+    const mx = (wx1 - wx0)*0.35, my = (wy1 - wy0)*0.35;
+    const x0 = wx0 - mx, x1 = wx1 + mx, y0 = wy0 - my, y1 = wy1 + my;
+    let s = 2 ** (zl - geo.z);
+
+    while((x1 - x0)*s*(y1 - y0)*s > 9e6 && zl > 2){ zl -= 0.5; s = 2 ** (zl - geo.z); }
+    const w = Math.max(1, Math.round((x1 - x0)*s)), h = Math.max(1, Math.round((y1 - y0)*s));
+    el.style.width = w + 'px'; el.style.height = h + 'px';
+    const cx = (x0 + x1)/2, cy = (y0 + y1)/2;
+    leafMap.invalidateSize({pan: false, animate: false});
+    leafMap.setView(unmerc(cx + geo.ox, cy + geo.oy, geo.z), zl, {animate: false});
+    leafCov = {geo, zl, s, w, h, cx, cy, x0, x1, y0, y1};
+  }
+
+  const C = leafCov, s = C.s;
+  const gx = C.cx - C.w/2/s, gy = C.cy - C.h/2/s;
+  el.style.transform = 'matrix(' + [a/s, b/s, c/s, d/s,
+    a*gx + c*gy + e, b*gx + d*gy + f].map(v => +v.toFixed(6)).join(',') + ')';
+}
+
+function leafNote(){
+  if(tileBad >= 4 && !tileOk)
+    mapNote(MAP_BASES[mapBase].osm && FROM_FILE
+      ? 'OpenStreetMap does not serve a page opened from a file ' + DEG +
+        ' open it through the API, or pick another map'
+      : 'the map tiles could not load ' + DEG + ' no internet? The sites are ' +
+        'still at their real positions');
+}
+
+function hideLeaf(){
+  const el = $('leaf');
+  if(!el.hidden) el.hidden = true;
+}
+
+function drawGround(box){
+  if(!geo){ hideLeaf(); drawPlates(box); return; }
+  if(leafState === 'off') loadLeaflet();
+  const W = cv.clientWidth, H = cv.clientHeight, dpr = devicePixelRatio || 1;
+  const cw = view3d ? Math.cos(yaw) : 1, sw = view3d ? Math.sin(yaw) : 0;
+  const se = view3d ? Math.sin(elev) : 1, k = cam.k;
+  const a = k*cw, b = k*se*sw, c = -k*sw, d = k*se*cw;
+  const e = W/2 - (a*cam.x + c*cam.y), f = H/2 - (b*cam.x + d*cam.y);
+  const B = MAP_BASES[mapBase];
+
+  const corners = [[0,0],[W,0],[0,H],[W,H]].map(([x, y]) => worldOf(x, y, 0));
+  const wx0 = Math.min(...corners.map(p => p.x));
+  const wx1 = Math.max(...corners.map(p => p.x));
+  const wy0 = Math.min(...corners.map(p => p.y));
+  const wy1 = Math.max(...corners.map(p => p.y));
+  if(wx0 >= wx1 || wy0 >= wy1) return;
+  if(leafOn()){ syncLeaf(a, b, c, d, e, f, wx0, wx1, wy0, wy1); return; }
+  hideLeaf();
+
+  let tz = Math.max(2, Math.min(B.max, Math.round(geo.z + Math.log2(k))));
+  let span, tx0, tx1, ty0, ty1;
+  for(;;){
+    span = 256 * 2 ** (geo.z - tz);
+    const lim = 2 ** tz - 1;
+    tx0 = Math.max(0, Math.floor((wx0 + geo.ox)/span));
+    tx1 = Math.min(lim, Math.floor((wx1 + geo.ox)/span));
+    ty0 = Math.max(0, Math.floor((wy0 + geo.oy)/span));
+    ty1 = Math.min(lim, Math.floor((wy1 + geo.oy)/span));
+    if((tx1-tx0+1)*(ty1-ty0+1) <= 220 || tz <= 2) break;
+    tz--;
+  }
+  ctx.save();
+  ctx.setTransform(a*dpr, b*dpr, c*dpr, d*dpr, e*dpr, f*dpr);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = B.blank;
+  ctx.fillRect(tx0*span - geo.ox, ty0*span - geo.oy,
+               (tx1-tx0+1)*span, (ty1-ty0+1)*span);
+  const seam = span/256*0.6;
+  if(B.invert) ctx.filter = INVERT;
+  for(let tx = tx0; tx <= tx1; tx++) for(let ty = ty0; ty <= ty1; ty++){
+    const t = tileAt(mapBase, tz, tx, ty);
+    if(t.ok) ctx.drawImage(t.img, tx*span - geo.ox, ty*span - geo.oy,
+                           span + seam, span + seam);
+  }
+  ctx.restore();
+  if(tileBad >= 4 && !tileOk)
+    mapNote('the map tiles could not load ' + DEG + ' no internet? The sites ' +
+            'are still at their real positions');
+
+}
+
+function setMap(on){
+  mapOn = on;
+  $('mapBtn').classList.toggle('on', on);
+  $('mapBtn').textContent = on ? 'graph' : 'map';
+  $('mapBase').hidden = !on;
+  $('mapAttr').hidden = !on;
+  $('mapAttr').innerHTML = MAP_BASES[mapBase].attr;
+  if(!on){ geo = null; mapNote(''); hideLeaf(); }
+  if(curIdx >= 0){ cam = {x: 0, y: 0, k: 1}; initSim(); }
+}
+$('mapBase').value = mapBase;
+$('mapBase').addEventListener('change', () => {
+  mapBase = $('mapBase').value;
+  prefSet('mapBase', mapBase);
+  tileOk = 0; tileBad = 0;
+  mapNote('');
+  $('mapAttr').innerHTML = MAP_BASES[mapBase].attr;
+  if(!raf) draw();
+});
+$('mapBtn').onclick = () => setMap(!mapOn);
+
+cv.addEventListener('mousedown', e => {
+  if(curIdx<0) return;
+  const r = cv.getBoundingClientRect();
+
+  if(view3d && e.button === 2){
+    drag = {rot:true, x:e.clientX, y:e.clientY, yaw0:yaw, el0:elev, moved:false};
+    cv.classList.add('drag');
+    return;
+  }
+  const hit = pick(e.clientX-r.left, e.clientY-r.top);
+  drag = hit && hit.kind==='node'
+    ? {node:hit.i, moved:false, panning:false}
+    : {x:e.clientX, y:e.clientY, cx:cam.x, cy:cam.y, moved:false, panning:true};
+  cv.classList.add('drag');
+});
+cv.addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('mouseup', e => {
+  if(drag && !drag.moved && !drag.rot){
+    const r = cv.getBoundingClientRect();
+    sel = pick(e.clientX-r.left, e.clientY-r.top);
+    if(!sel) showCluster();
+    else if(sel.kind==='node') showNode(sel.i);
+    else showEdge(sel.i);
+    draw();
+  }
+  drag = null; cv.classList.remove('drag');
+});
+cv.addEventListener('mousemove', e => {
+  if(curIdx<0) return;
+  const r = cv.getBoundingClientRect();
+  const mx = e.clientX-r.left, my = e.clientY-r.top;
+  if(drag){
+    if(!drag.panning || Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)>3)
+      drag.moved = true;
+    if(drag.rot){
+
+      yaw  = drag.yaw0 - (e.clientX-drag.x)*0.0065;
+      elev = Math.max(0.16, Math.min(1.5,
+                      drag.el0 + (e.clientY-drag.y)*0.005));
+    } else if(drag.panning){
+
+      const cw = view3d ? Math.cos(yaw) : 1, sw = view3d ? Math.sin(yaw) : 0;
+      const sdx = (e.clientX-drag.x)/cam.k;
+      const sdy = (e.clientY-drag.y)/cam.k / (view3d ? Math.sin(elev) : 1);
+      cam.x = drag.cx-( sdx*cw + sdy*sw);
+      cam.y = drag.cy-(-sdx*sw + sdy*cw);
+    } else {
+
+      const n = N[drag.node];
+      const w = worldOf(mx, my, zOf(n));
+      let t = n, dx = 0, dy = 0;
+      while(t.anchor != null){
+        if(t.off){ dx += t.off.x; dy += t.off.y; }
+        t = N[t.anchor];
+      }
+      t.fx = t.x = w.x - dx; t.fy = t.y = w.y - dy;
+      for(const q of N)
+        if(q.anchor != null || q.wall || (q.cent && q.fx == null)) placeAnchored(q);
+    }
+    if(!raf) draw();
+    return;
+  }
+  const p = pick(mx,my);
+  const changed = JSON.stringify(p) !== JSON.stringify(hover);
+  hover = p;
+  if(p){
+    tip.style.display='block';
+    tip.style.left=(mx+13)+'px'; tip.style.top=(my+13)+'px';
+    if(p.kind==='node'){
+      const n=N[p.i];
+      tip.textContent = n.type==='site' ? siteLabel(G.sites[n.ref])
+        : n.type==='ne' ? neTip(n)
+        : n.type==='ticket' ? 'ticket '+TK[n.ref].id+' @ '+G.sites[TK[n.ref].s].n+
+            (n.als ? ' '+DEG+' '+n.als.length+(TK[n.ref].na != null
+                       ? ' of '+Math.max(TK[n.ref].na, n.als.length)+' alarms here'
+                       : ' alarm'+(n.als.length === 1 ? '' : 's')+' here')
+                   : ' '+DEG+' '+iso(TK[n.ref].t).slice(11)+' '+DEG+' '+sgn(n.d)+' from its nearest alarm')
+        : n.type==='rc' ? 'resolution '+n.ref+' '+DEG+' '+n.cent.length+' ticket'+(n.cent.length === 1 ? '' : 's')
+        : n.type==='wo' ? 'work order '+TK[n.tk].wo[n.w].id+' '+DEG+' '+(TK[n.tk].wo[n.w].st || '')+
+            ' '+DEG+' ticket '+TK[n.tk].id+(TK[n.tk].wo[n.w].rc ? ' '+DEG+' '+TK[n.tk].wo[n.w].rc : '')
+        : n.type==='syn' ? 'synthetic alarm '+n.ref+' '+DEG+' '+(n.tk != null
+            ? 'of ticket '+TK[n.tk].id+' '+DEG+' '+synWhere(n).replace(/<[^>]+>/g, '')
+            : n.cent.length+' ticket'+(n.cent.length === 1 ? '' : 's'))
+        : G.strings[G.alarms[n.ref].n]+' @ '+G.sites[G.alarms[n.ref].s].n
+          + (G.alarms[n.ref].dr ? ' ('+G.strings[G.alarms[n.ref].dr]+')' : '');
+    } else {
+      const e=E[p.i];
+      tip.textContent = e.kind==='corr'
+        ? (e.ref.s == null ? 'not a model pair' : 'score '+e.ref.s.toFixed(2))+
+          ' '+DEG+' '+e.ref.g+'s'
+        : e.kind==='bundle' ? bundleTip(e)
+        : e.kind==='topo' ? 'real topology link'
+        : e.kind==='tklink' ? (N[e.a].type === 'syn' ? 'the synthetic alarm of this ticket'
+                               : TK_BY_ID ? 'this alarm is on this ticket'
+                                          : 'ticket at this site (matched by site + time)')
+        : e.kind==='synjudge' || e.kind==='synsyn'
+          ? (e.kind==='synsyn' ? 'two synthetic alarms: ' : 'alarm and its synthetic alarm: ')+(synJudgeInfo(e)
+              ? 'cleared '+(synJudgeInfo(e).ok ? 'together' : 'apart')+' ('+dur(synJudgeInfo(e).dc)+', judged by '+
+                durT(synJudgeInfo(e).tol)+')' : 'not judged')
+        : e.kind==='synlink' ? (SYN_LOW ? 'this alarm is on the ticket of this synthetic alarm'
+                                        : 'the synthetic alarm this ticket names')
+        : e.kind==='held' ? 'held by its ticket: not a model pair'
+        : e.kind==='rcup' ? 'ticket '+TK[N[e.a].ref].id+': '+N[e.b].ref
+        : e.kind==='wolink' ? 'ticket '+TK[N[e.b].tk].id+' opened work order '+TK[N[e.b].tk].wo[N[e.b].w].id
+        : e.kind==='nelink' ? 'device link on the NE graph: '+neName(e.a)+' '+ARR+' '+neName(e.b)
+        : e.kind==='nex2' ? 'X2 / Xn neighbours: '+neName(e.a)+' '+ARR+' '+neName(e.b)
+        : e.kind==='necell' ? 'cell '+neName(e.b)+' of '+neName(e.a)
+        : e.kind==='nepost' ? neName(e.b)+' at '+G.sites[N[e.a].ref].n
+        : e.home ? 'its own site, '+G.sites[N[e.a].ref].n+' (the device it is raised on stands at another site)'
+        : e.kind==='anc' || e.dev ? 'alarm raised on '+neName(e.a)
+        : e.branch ? 'later alarm at the same site' : 'alarm to its site';
+    }
+  } else tip.style.display='none';
+  if(changed && !raf) draw();
+});
+cv.addEventListener('mouseleave', ()=>{ tip.style.display='none'; hover=null; if(!raf) draw(); });
+cv.addEventListener('wheel', e => {
+  if(curIdx<0) return;
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+
+  const w0 = worldOf(mx, my, 0);
+  cam.k = Math.max(.15, Math.min(20, cam.k*(e.deltaY<0?1.15:1/1.15)));
+  const w1 = worldOf(mx, my, 0);
+  cam.x += w0.x-w1.x; cam.y += w0.y-w1.y;
+  if(!raf) draw();
+}, {passive:false});
+
+$('sort').addEventListener('change', renderList);
+$('day').addEventListener('change', () => {
+  buildClusters(); renderList(); draw();
+});
+$('crossOnly').addEventListener('change', () => {
+  buildClusters(); renderList(); draw();
+});
+$('cc').addEventListener('change', () => {
+  buildClusters(); renderList(); draw();
+});
+
+$('tk').addEventListener('change', () => {
+  ticketMode = $('tk').checked;
+  drawLegend(); $('acc').innerHTML = verifiedLine(); draw();
+});
+$('showSites').addEventListener('change', () => { if(!raf) draw(); });
+$('lines').value = lineMode;
+$('lines').addEventListener('change', () => {
+  lineMode = $('lines').value;
+  prefSet('lines', lineMode);
+  drawLegend();
+  if(curIdx < 0 || !N.length) return;
+
+  applyLineMode();
+  ticks = 0;
+  if(!raf) step();
+});
+
+$('d3').addEventListener('change', () => {
+  view3d = $('d3').checked;
+  if(!raf) draw();
+});
+
+$('tidy').addEventListener('change', () => { if(curIdx>=0) initSim(); });
+if(HAS_NE) $('neWrap').hidden = false;
+$('neStack').addEventListener('change', () => { if(curIdx>=0) initSim(); });
+$('relayout').addEventListener('click', () => { if(curIdx>=0) initSim(); });
+let qt=null;
+$('q').addEventListener('input', ()=>{ clearTimeout(qt); qt=setTimeout(renderList,150); });
+addEventListener('resize', resize);
+
+if(M.coclear_default && M.coclear_tol_sec != null) $('cc').checked = true;
+
+const PANELS = {
+  list:   {grip: 'listGrip',   cssVar: '--list-w',   shut: 'lshut',
+           min: 200, max: 760, grows: +1, canvas: true},
+  detail: {grip: 'detailGrip', cssVar: '--detail-w', shut: 'dshut',
+           min: 240, max: 760, grows: -1, canvas: false},
+};
+for(const [name, p] of Object.entries(PANELS)){
+  const w = +prefGet(name+'W');
+  if(w >= p.min && w <= p.max)
+    document.documentElement.style.setProperty(p.cssVar, w+'px');
+  if(prefGet(name+'Shut') === '1') document.body.classList.add(p.shut);
+  const grip = $(p.grip);
+  grip.addEventListener('mousedown', e => {
+    e.preventDefault(); e.stopPropagation();
+    const x0 = e.clientX;
+    const w0 = parseFloat(getComputedStyle(document.documentElement)
+                          .getPropertyValue(p.cssVar)) || p.min;
+    const wasShut = document.body.classList.contains(p.shut);
+    let moved = false, pending = false;
+    grip.classList.add('on');
+    document.body.classList.add('resizing');
+    const move = ev => {
+      if(!moved && Math.abs(ev.clientX - x0) < 4) return;
+      if(!moved){
+        moved = true;
+
+        if(wasShut) document.body.classList.remove(p.shut);
+      }
+      const base = wasShut ? 0 : w0;
+      const w = Math.round(Math.max(p.min, Math.min(p.max,
+                  base + (ev.clientX - x0) * p.grows)));
+      document.documentElement.style.setProperty(p.cssVar, w+'px');
+      if(p.canvas && !pending){
+        pending = true;
+        requestAnimationFrame(() => { pending = false; resize(); });
+      }
+    };
+    const up = () => {
+      removeEventListener('mousemove', move);
+      removeEventListener('mouseup', up);
+      grip.classList.remove('on');
+      document.body.classList.remove('resizing');
+      if(moved){
+        prefSet(name+'W', parseFloat(getComputedStyle(document.documentElement)
+                                     .getPropertyValue(p.cssVar)));
+        prefSet(name+'Shut', '0');
+        if(p.canvas) resize();
+      } else {
+        togglePanel(name);
+      }
+    };
+    addEventListener('mousemove', move);
+    addEventListener('mouseup', up);
+  });
+}
+
+function togglePanel(name){
+  const p = PANELS[name];
+  const shut = document.body.classList.toggle(p.shut);
+  prefSet(name+'Shut', shut ? '1' : '0');
+  if(p.canvas) resize();
+}
+addEventListener('keydown', e => {
+  const tag = e.target.tagName;
+  if(tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  if(e.key === '[')      { togglePanel('list');   e.preventDefault(); }
+  else if(e.key === ']') { togglePanel('detail'); e.preventDefault(); }
+  else if((e.key === 'm' || e.key === 'M') && curIdx >= 0 && !$('player').hidden){
+    setMap(!mapOn); e.preventDefault();
+  }
+});
+
+buildClusters();
+renderList();
+resize();
+</script>
