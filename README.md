@@ -145,8 +145,28 @@ cause: association rules tested against chance, and a topological Hawkes process
 
 ## Results on production data
 
-<!-- TODO: aggregate figures only, after written approval from the employer (no site names, ticket numbers or raw data). -->
-*To be added.*
+The same approach ran on a national mobile operator's alarm feed: one held-out test day of hundreds of thousands of
+alarms and thousands of tickets. Aggregate figures only; no data leaves the operator.
+
+There is no ground truth in production, so the merges are judged by what the field crews wrote when they closed each
+ticket, without seeing the model. **Chance** is the same merged tickets with their causes shuffled among them (1,000
+shuffles): it keeps the mix of causes, so a day dominated by power failures cannot flatter the result.
+
+| Yardstick | Merged ticket pairs judged | Same cause | Chance (95% range) | Lift |
+|---|---:|---:|---:|---:|
+| Resolution code, full cause | 1,440 | **81.7%** | 39.5% (35.3–44.0) | **2.1x** |
+| Resolution code, first part (power, fibre cut, ...) | 1,440 | **88.5%** | 52.6% (48.5–57.0) | 1.7x |
+| Work-order root cause | 285 | **81.4%** | 33.9% (28.4–40.0) | **2.4x** |
+
+* **Per ticket** (each ticket one vote, so one large incident cannot dominate): 73.2% of a ticket's merged partners
+  share its cause, against 39.4% by chance.
+* The model merged about **a fifth of the day's tickets** into shared incidents; the largest held 18 tickets.
+* **Live replay** over 12 hours, 5-minute ticks: 0.84% of incidents split relative to the batch run (ARI 0.995), an
+  incident on the map 1.8 minutes after its second alarm (median; 4.5 at p90), about 8 seconds a tick. Naive 30-minute
+  blocks split 36% of incidents.
+
+These figures and the synthetic ones use different yardsticks: the synthetic table is scored against the true
+incidents, production against the crews' codes, which are themselves noisy.
 
 ## What didn't work
 
