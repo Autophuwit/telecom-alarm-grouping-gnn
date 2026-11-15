@@ -2457,7 +2457,7 @@ function alarmLine(i){
       ? 'attached on the topology path: fired as this incident went down, at a site on '+
         'the path between its sites; the model linked it elsewhere or to nothing'
       : a.tm
-      ? 'moved here by its ticket (pure_view --ticket-home): the model put it in another incident'
+      ? 'moved here by its ticket: the model put it in another incident'
       : 'held here by its ticket: the model linked it to nothing')+'</span>' : '')+
     (a.l ? '<br>label: '+Object.entries(a.l).map(
         ([k,v])=>k+'='+G.strings[v]).join(', ') : '')+hkLine(a)+'</div></div>';
