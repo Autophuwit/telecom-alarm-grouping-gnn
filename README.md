@@ -100,6 +100,43 @@ incidents into one self-contained HTML page ([`web/template.html`](web/template.
 python -m aig.view --data data/synthetic --run runs/demo --out docs/index.html
 ```
 
+## Running live: a refresh every 5 minutes
+
+Batch clustering sees the whole day. An operations map is refreshed every few minutes from the alarms known so far,
+and that raises problems batch never meets ([`aig.live`](src/aig/live.py)):
+
+* **Stable IDs.** Each refresh re-clusters from scratch, so a cluster label means nothing from one tick to the next. A
+  tracker carries IDs across ticks: an incident keeps its ID while it grows (`202601181946_T002547`: first onset + first
+  ticket), the oldest survives a merge and the others point to it, and a split is born with `split_from`.
+* **A bounded window.** Each tick re-clusters only the last 3 hours, plus every alarm of an incident still live, so an
+  incident is never cut by the window.
+* **Freezing.** An incident with no new alarm for 60 minutes is settled and leaves the pool for good.
+* **Flicker.** Re-running average linkage as alarms arrive moves borderline alarms back and forth. The map holds a new
+  placement back until it has lasted 2 ticks.
+* **State** is written to SQLite each tick (incidents, members, events), only what changed.
+
+Replay of one test day (3,019 alarms), compared with the batch clustering of the same day and with the ground truth:
+
+| Setting | Incidents split vs batch | ARI vs batch | Latency p50 / p90 | Ticket-pair precision / recall (truth) |
+|---|---:|---:|---:|---:|
+| Batch: whole day at once | — | — | — | 98% / 45% |
+| Naive: disjoint 30-min blocks | 22% | 0.98 | 13 / 27 min | 98% / 45% |
+| 5-min ticks, batch scores | **0.6%** | **1.00** | **2.3 / 7.5 min** | 98% / 45% |
+| 5-min ticks, GNN scoring live | 22% | 0.82 | 2.3 / 7.3 min | 97% / 39% |
+
+*Latency: from an incident's second alarm to the first tick it shows on the map.*
+
+* The windowing and the ID tracker cost almost nothing: with the same scores, live matches batch (0.6% of incidents
+  split) and an incident appears about 2 minutes after its second alarm.
+* The real cost of running live is the **model's view**: the newest alarms are scored before their context has
+  arrived. That costs 6 points of recall and more churn (47 flickers a day at hold 2, against 10). Rescoring an
+  incident with full context when it settles is the next thing to try.
+* A tick takes 0.2 s (p95) including building and scoring the window's graph, far inside a 5-minute budget.
+
+```bash
+python -m aig.live --data data/synthetic --run runs/demo --db runs/demo/live.sqlite
+```
+
 ## Results on production data
 
 <!-- TODO: aggregate figures only, after written approval from the employer (no site names, ticket numbers or raw data). -->
@@ -121,7 +158,7 @@ Lessons from the production project, kept because they shaped the design:
 
 ```
 synthetic/generate.py           network simulator: topology, failures, tickets, ground truth
-src/aig/                        the pipeline (data, graph, labels, model, cluster, evaluate, run, view)
+src/aig/                        the pipeline (data, graph, labels, model, cluster, evaluate, run, view, live)
 notebooks/01_data_and_labels    what each weak label gets wrong
 notebooks/02_model_and_clustering   candidate graph, pair scores, clustering, error analysis
 web/template.html               the interactive view (plain HTML + JS, data injected as JSON)
