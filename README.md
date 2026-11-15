@@ -137,6 +137,12 @@ Replay of one test day (3,019 alarms), compared with the batch clustering of the
 python -m aig.live --data data/synthetic --run runs/demo --db runs/demo/live.sqlite
 ```
 
+## Next: which alarm is the cause?
+
+Grouping says what belongs together; the companion study
+[alarm-root-cause-study](https://github.com/Autophuwit/alarm-root-cause-study) asks which alarm in an incident is the
+cause: association rules tested against chance, and a topological Hawkes process of who set off whom.
+
 ## Results on production data
 
 <!-- TODO: aggregate figures only, after written approval from the employer (no site names, ticket numbers or raw data). -->
