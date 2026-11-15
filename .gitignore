@@ -1,0 +1,7 @@
+# generated: rebuild with `python synthetic/generate.py --days 14` and `python -m aig.run`
+data/
+runs/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
