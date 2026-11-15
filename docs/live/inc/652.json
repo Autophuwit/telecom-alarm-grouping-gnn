@@ -1,0 +1,1 @@
+{"g":652,"sites":[["NE941532",null,null,0],["NE464303",null,null,0],["NE289241",null,null,0]],"alarms":[[1,1768733853,"VSWR_HIGH","RF HARDWARE",1,-1,"",0,0],[0,1768733967,"VSWR_HIGH","RF HARDWARE",1,-1,"",0,0],[2,1768734745,"VSWR_HIGH","RF HARDWARE",1,-1,"",0,0]],"leaving":[],"nes":[],"nelinks":[],"edges":[[0,1,0.408,114,-1,null],[1,2,0.396,778,-1,null]],"topo":[],"tickets":[]}

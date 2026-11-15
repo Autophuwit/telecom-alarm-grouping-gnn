@@ -1,0 +1,1 @@
+{"g":1107,"sites":[["NE910526",null,null,0]],"alarms":[[0,1768761956,"CPRI_LINK_FAIL","RF HARDWARE",1,-1,"T002412",0,0],[0,1768762326,"CPRI_LINK_FAIL","RF HARDWARE",1,-1,"T002412",0,0],[0,1768762515,"CPRI_LINK_FAIL","RF HARDWARE",1,-1,"T002413",0,0]],"leaving":[],"nes":[],"nelinks":[],"edges":[],"topo":[],"tickets":[["T002412",0,[0,1],""],["T002413",0,[2],""]]}

@@ -54,11 +54,12 @@ def keep_links(i, j, s, per_alarm):
     return np.unique(top.k.to_numpy())
 
 
-def build_payload(c, day, model, vocab, thr, tol, max_incidents=60, per_alarm=6):
+def build_payload(c, day, model, vocab, thr, tol, max_incidents=60, per_alarm=6, labels=None, min_tickets=2):
+    """labels: (cluster, incident) per alarm to draw instead of the batch grouping (the live map's final incidents)."""
     n = day_nodes(c, day)
     nt, E = day_tickets(c, n), build_day(n, c.links)
     s = score(model, DayTensors(n, E, vocab))
-    lab, inc = group_day(len(n), E, s, nt, thr)
+    lab, inc = group_day(len(n), E, s, nt, thr) if labels is None else (np.asarray(labels[0]), np.asarray(labels[1]))
     N = len(n)
 
     # which incidents to draw: those that merge tickets, most tickets first
@@ -66,7 +67,7 @@ def build_payload(c, day, model, vocab, thr, tol, max_incidents=60, per_alarm=6)
     per = pd.DataFrame({"alarms": np.bincount(inc)})
     per["tickets"] = tk_inc.groupby("g").ticket_id.nunique().reindex(per.index, fill_value=0)
     per["sites"] = pd.Series(n.site.to_numpy()).groupby(inc).agg(lambda x: len(set(x) - {""})).reindex(per.index)
-    pick = per[(per.alarms >= 2) & (per.tickets >= 2)].sort_values(["tickets", "alarms"], ascending=False).head(max_incidents)
+    pick = per[(per.alarms >= 2) & (per.tickets >= min_tickets)].sort_values(["tickets", "alarms"], ascending=False).head(max_incidents)
     chosen = np.zeros(len(per), bool)
     chosen[pick.index.to_numpy()] = True
 

@@ -137,6 +137,23 @@ Replay of one test day (3,019 alarms), compared with the batch clustering of the
 python -m aig.live --data data/synthetic --run runs/demo --db runs/demo/live.sqlite
 ```
 
+### The live incident map
+
+What operations sees: every incident on one map, refreshed every 5 minutes, with its state (**just in**, **ongoing**,
+**quiet 1 h+**), tickets, alarm types and blast radius. Clicking one sets its 3-D view down on the map: sites, the
+device stack, alarms with the model's pairs, and tickets. **[Open the replay](https://autophuwit.github.io/telecom-alarm-grouping-gnn/live/)**
+
+![The live incident map: every incident of the network at 11:00](reports/figures/live_map.png)
+![One incident opened in 3-D on the map](reports/figures/live_map_incident.png)
+
+In production the live engine rewrites the map's files every tick and the page polls them. GitHub Pages cannot run
+the engine, so [`aig.livemap`](src/aig/livemap.py) replays a test day through the same engine (live GNN scoring,
+stable IDs, freezing) and writes the files the page reads at each 15-minute step; the page plays them back.
+
+```bash
+python -m aig.livemap --data data/synthetic --run runs/demo --out docs/live
+```
+
 ## Next: which alarm is the cause?
 
 Grouping says what belongs together; the companion study
@@ -184,11 +201,13 @@ Lessons from the production project, kept because they shaped the design:
 
 ```
 synthetic/generate.py           network simulator: topology, failures, tickets, ground truth
-src/aig/                        the pipeline (data, graph, labels, model, cluster, evaluate, run, view, live)
+src/aig/                        the pipeline (data, graph, labels, model, cluster, evaluate, run, view, live, livemap)
 notebooks/01_data_and_labels    what each weak label gets wrong
 notebooks/02_model_and_clustering   candidate graph, pair scores, clustering, error analysis
 web/template.html               the interactive view (plain HTML + JS, data injected as JSON)
+web/live_map.html               the live incident map (Leaflet; polls its files, or replays them)
 docs/index.html                 a rendered demo day, served by GitHub Pages
+docs/live/                      the live map replay of that day
 reports/figures/                figures used in this README
 ```
 
@@ -199,6 +218,7 @@ pip install -e .                                  # Python 3.10+, CPU is enough
 python synthetic/generate.py --days 14            # writes data/synthetic/
 python -m aig.run --data data/synthetic --out runs/demo --train-days 8 --val-days 2   # under a minute on CPU
 python -m aig.view --out docs/index.html          # the interactive page for the last test day
+python -m aig.livemap --out docs/live             # the live map, replayed (about a minute)
 ```
 
 The notebooks are stored with their outputs. Re-run them in Jupyter, or rebuild them with

@@ -240,8 +240,9 @@ class Tracker:
         N = len(self.cur)
         return np.where(self.cur >= 0, self.cur, N + np.arange(N))
 
-    def snapshot(self, now, labels=None):
-        """The incidents a map would draw at this tick, as plain dicts."""
+    def snapshot(self, now, labels=None, extra=None):
+        """The incidents a map would draw at this tick, as plain dicts. labels: the handle per alarm to draw (a
+        Display's `shown`); extra(members) -> dict adds display fields."""
         labels = self.cur if labels is None else np.asarray(labels)
         idx = np.flatnonzero(labels >= 0)
         idx = idx[np.argsort(labels[idx], kind="stable")]
@@ -251,11 +252,18 @@ class Tracker:
             inc = self.inc[h]
             if len(m) < self.min_size:
                 continue
-            out.append({"id": inc.id, "state": inc.state, "first_onset": clock(self.day, inc.first_t),
-                        "last_onset": clock(self.day, inc.last_t), "n_alarms": int(len(m)),
-                        "tickets": sorted({str(x) for x in self.ticket[m] if x}), "split_from": inc.split_from,
-                        "why_frozen": inc.why_frozen})
-        return {"tick": clock(self.day, now), "n_incidents": len(out), "incidents": out}
+            d = {"id": inc.id, "state": inc.state, "first_onset": clock(self.day, inc.first_t),
+                 "last_onset": clock(self.day, inc.last_t), "first_t": inc.first_t, "last_t": inc.last_t,
+                 "n_alarms": int(len(m)), "tickets": sorted({str(x) for x in self.ticket[m] if x}),
+                 "split_from": inc.split_from, "merged_from": [], "why_frozen": inc.why_frozen}
+            if extra is not None:
+                d.update(extra(m))
+            out.append(d)
+        by = {d["id"]: d for d in out}
+        for inc in self.inc:
+            if inc.merged_into and self.resolve(inc.id) in by:
+                by[self.resolve(inc.id)]["merged_from"].append(inc.id)
+        return {"tick": float(now), "tick_clock": clock(self.day, now), "n_incidents": len(out), "incidents": out}
 
 
 class Display:
