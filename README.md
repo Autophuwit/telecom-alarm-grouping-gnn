@@ -177,7 +177,8 @@ shuffles): it keeps the mix of causes, so a day dominated by power failures cann
 
 * **Per ticket** (each ticket one vote, so one large incident cannot dominate): 73.2% of a ticket's merged partners
   share its cause, against 39.4% by chance.
-* The model merged about **a fifth of the day's tickets** into shared incidents; the largest held 18 tickets.
+* The model merged about a fifth of the day's tickets into shared incidents. Counting only the merges the crews'
+  codes confirm, the **net reduction is 12.1% of the day's tickets**. The largest incident held 18 tickets.
 * **Live replay** over 12 hours, 5-minute ticks: 0.84% of incidents split relative to the batch run (ARI 0.995), an
   incident on the map 1.8 minutes after its second alarm (median; 4.5 at p90), about 8 seconds a tick. Naive 30-minute
   blocks split 36% of incidents.
