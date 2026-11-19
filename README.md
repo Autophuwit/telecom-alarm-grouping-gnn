@@ -156,8 +156,8 @@ python -m aig.livemap --data data/synthetic --run runs/demo --out docs/live
 
 ## Next: which alarm is the cause?
 
-Grouping says what belongs together; the companion study
-[alarm-root-cause-study](https://github.com/Autophuwit/alarm-root-cause-study) asks which alarm in an incident is the
+Grouping says what belongs together; a companion study (*alarm-root-cause-study*, in progress, not public yet)
+asks which alarm in an incident is the
 cause: association rules tested against chance, and a topological Hawkes process of who set off whom.
 
 ## Results on production data
